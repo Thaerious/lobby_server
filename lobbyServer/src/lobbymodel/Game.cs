@@ -1,3 +1,5 @@
+using System.Text.RegularExpressions;
+
 namespace frar.lobbyserver;
 
 public class Game {
@@ -20,7 +22,7 @@ public class Game {
         }
     }
 
-    public Game(string name, Player owner, string password, int maxplayers) {
+    public Game(string name, Player owner, int maxplayers, string password) {
         if (maxplayers < 2 || maxplayers > 5) throw new MaxPlayersException(maxplayers);
 
         this.Name = name;
@@ -91,5 +93,14 @@ public class Game {
     /// <returns>True if the player is in the game, otherwise false</returns>
     public bool HasPlayer(Player player) {
         return Players.Contains(player);
+    }
+
+    public static bool CheckName(string name) {        
+        name = name.Trim();
+        if (name.Length > 24) return false;
+        if (name.Length < 3) return false;
+        Regex rx = new Regex("^[a-zA-Z0-9 ._/-]+$");
+        if (rx.Matches(name).Count == 1) return true;
+        return false;
     }
 }

@@ -173,8 +173,70 @@ public class LobbyRouterTest {
 
         var clientPacket = conn.Get("LoginRejected");
 
-        Assert.IsNotNull(clientPacket);
+        Assert
+
+        .IsNotNull(clientPacket);
     }
+}
+
+/// <summary>
+/// Test the CreateGame method of the LobbyRouter class.
+/// 
+/// To test just this class:
+/// dotnet test --filter ClassName=frar.lobbyserver.test.CreateGameTest
+/// 
+/// Run tests with code coverage
+/// dotnet test --collect:"XPlat Code Coverage"
+/// 
+/// Generate coverage reports
+/// reportgenerator -reports:lobbyServerTest/TestResults/**/*.xml -targetdir:"coverage" -reporttypes:Html
+/// </summary>
+[TestClass]
+public class CreateGameTest {
+
+
+
+    /// <summary>
+    /// Creating a game will send packet to user.
+    /// Not including a password is undefined.
+    /// </summary> 
+    [TestMethod]
+    public void create_game_without_password() {
+        var router = new LobbyRouter();
+        new DatabaseInterface().ClearAll();
+        var conn = new TestConnection();
+        router.Connection = conn;       
+
+        router.RegisterPlayer("whoami", "super secret", "who@ami");
+        router.Login("whoami", "super secret");
+        router.CreateGame("my game", 4);
+
+        var createGamePacket = conn.Get("CreateAccepted");
+        Assert.IsNotNull(createGamePacket);
+        Assert.Equals("my game", createGamePacket["gamename"]);
+        Assert.Equals(4, createGamePacket["maxplayers"]);
+    }
+
+    /// <summary>
+    /// Creating a game will send packet to user.
+    /// Including a password.
+    /// </summary> 
+    [TestMethod]
+    public void create_game_with_password() {
+        var router = new LobbyRouter();
+        new DatabaseInterface().ClearAll();
+        var conn = new TestConnection();
+        router.Connection = conn;       
+
+        router.RegisterPlayer("whoami", "super secret", "who@ami");
+        router.Login("whoami", "super secret");
+        router.CreateGame("my game", 4, "game password");
+
+        var createGamePacket = conn.Get("CreateAccepted");
+        Assert.IsNotNull(createGamePacket);
+        Assert.Equals("my game", createGamePacket["gamename"]);
+        Assert.Equals(4, createGamePacket["maxplayers"]);
+    }    
 }
 
 class TestConnection : IConnection {

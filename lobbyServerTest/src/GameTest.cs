@@ -25,8 +25,8 @@ public class GameTest {
     [TestMethod]
     public void game_constructor_sanity_test() {
         var adam = new Player("adam");
-        
-        var game = new Game("adam's game", adam, "secret", 4);
+
+        var game = new Game(name: "adam's game", owner: adam, password : "secret", maxplayers : 4);
         Assert.AreEqual("adam's game", game.Name);
         Assert.AreEqual(adam, game.Owner);
         Assert.AreEqual("secret", game.Password);
@@ -37,7 +37,7 @@ public class GameTest {
     public void invited_starts_empty() {
         var adam = new Player("adam");
 
-        var game = new Game("adam's game", adam, "secret", 4);
+        var game = new Game("adam's game", adam, 4, "secret");
         Assert.AreEqual(0, game.Invited.Count);
     }
 
@@ -48,7 +48,7 @@ public class GameTest {
     public void players_starts_with_owner() {
         var adam = new Player("adam");
 
-        var game = new Game("adam's game", adam, "", 4);
+        var game = new Game("adam's game", adam, 4, "");
         Assert.AreEqual(1, game.Players.Count);
         Assert.IsTrue(game.HasPlayer(adam));
     }
@@ -61,7 +61,7 @@ public class GameTest {
         var adam = new Player("adam");
         var eve = new Player("eve");
 
-        var game = new Game("adam's game", adam, "", 4);
+        var game = new Game("adam's game", adam, 4, "");
         Assert.AreEqual(1, game.Players.Count);
         Assert.IsFalse(game.HasPlayer(eve));
     }
@@ -72,7 +72,7 @@ public class GameTest {
         var adam = new Player("adam");
         var eve = new Player("eve");
 
-        var game = new Game("adam's game", adam, "", 4);
+        var game = new Game("adam's game", adam, 4, "");
         game.AddPlayer(eve);
         game.AddPlayer(eve);
     }
@@ -86,7 +86,7 @@ public class GameTest {
         var able = new Player("able");
         var bob = new Player("bob");
 
-        var game = new Game("adam's game", adam, "", 4);
+        var game = new Game("adam's game", adam, 4, "");
         game.AddPlayer(eve);
         game.AddPlayer(cane);
         game.AddPlayer(able);
@@ -98,7 +98,7 @@ public class GameTest {
         var adam = new Player("adam");
         var eve = new Player("eve");
 
-        var game = new Game("adam's game", adam, "", 4);
+        var game = new Game("adam's game", adam, 4, "");
         game.AddPlayer(eve);
         Assert.IsTrue(game.HasPlayer(eve));
     }
@@ -111,7 +111,7 @@ public class GameTest {
         var adam = new Player("adam");
         var eve = new Player("eve");
 
-        var game = new Game("adam's game", adam, "", 4);
+        var game = new Game("adam's game", adam, 4, "");
         Assert.IsTrue(game.AddPlayer(eve));
     }
 
@@ -123,7 +123,7 @@ public class GameTest {
         var adam = new Player("adam");
         var eve = new Player("eve");
 
-        var game = new Game("adam's game", adam, "secret", 4);
+        var game = new Game("adam's game", adam, 4, "secret");
         Assert.IsFalse(game.AddPlayer(eve, "dunno password"));
     }
 
@@ -135,7 +135,7 @@ public class GameTest {
         var adam = new Player("adam");
         var eve = new Player("eve");
 
-        var game = new Game("adam's game", adam, "", 4);
+        var game = new Game("adam's game", adam, 4, "");
         game.AddPlayer(eve);
         game.RemovePlayer(eve);
         Assert.IsFalse(game.HasPlayer(eve));
@@ -147,7 +147,7 @@ public class GameTest {
         var adam = new Player("adam");
         var eve = new Player("eve");
 
-        var game = new Game("adam's game", adam, "", 4);
+        var game = new Game("adam's game", adam, 4, "");
         game.RemovePlayer(adam);
     }
 
@@ -157,7 +157,7 @@ public class GameTest {
         var adam = new Player("adam");
         var eve = new Player("eve");
 
-        var game = new Game("adam's game", adam, "", 4);
+        var game = new Game("adam's game", adam, 4, "");
         game.RemovePlayer(eve);
     }
 
@@ -166,7 +166,7 @@ public class GameTest {
         var adam = new Player("adam");
         var eve = new Player("eve");
 
-        var game = new Game("adam's game", adam, "", 4);
+        var game = new Game("adam's game", adam, 4, "");
         game.AddInvite(eve);
         Assert.IsTrue(game.Invited.Contains(eve));
     }
@@ -176,9 +176,30 @@ public class GameTest {
         var adam = new Player("adam");
         var eve = new Player("eve");
 
-        var game = new Game("adam's game", adam, "", 4);
+        var game = new Game("adam's game", adam, 4, "");
         game.AddInvite(eve);
         game.RemoveInvite(eve);
         Assert.IsFalse(game.Invited.Contains(eve));
     }
+
+    [TestMethod]
+    public void check_name_valid() {
+        Assert.IsTrue(Game.CheckName("apple"));
+        Assert.IsTrue(Game.CheckName("apple sauce"));
+        Assert.IsTrue(Game.CheckName("apple-sauce"));
+        Assert.IsTrue(Game.CheckName("apple_sauce"));
+        Assert.IsTrue(Game.CheckName("apple.sauce"));
+        Assert.IsTrue(Game.CheckName("12345678901234567901234"));
+        Assert.IsTrue(Game.CheckName("123"));
+    }
+
+    [TestMethod]
+    public void check_name_invalid() {
+        Assert.IsFalse(Game.CheckName("1234567890123456789012345"));
+        Assert.IsFalse(Game.CheckName("***"));
+        Assert.IsFalse(Game.CheckName("\"abc\""));
+        Assert.IsFalse(Game.CheckName("1"));
+        Assert.IsFalse(Game.CheckName("12"));
+        Assert.IsFalse(Game.CheckName("     "));
+    }    
 }

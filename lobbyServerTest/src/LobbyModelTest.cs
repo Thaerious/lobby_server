@@ -45,14 +45,14 @@ public class LobbyModelTest {
     [ExpectedException(typeof(UnknownPlayerException))]
     public void create_game_unknown_player() {
         LobbyModel lobbyModel = new LobbyModel();
-        lobbyModel.CreateGame("Adam's Game", "Adam", "password", 4);
+        lobbyModel.CreateGame("Adam's Game", "Adam", 4, "password");
     }
 
     [TestMethod]
     public void create_game_sanity() {
         LobbyModel lobbyModel = new LobbyModel();
         lobbyModel.AddPlayer("Adam");
-        lobbyModel.CreateGame("Adam's Game", "Adam", "password", 4);
+        lobbyModel.CreateGame("Adam's Game", "Adam", 4, "password");
     }
 
     [TestMethod]
@@ -60,7 +60,7 @@ public class LobbyModelTest {
         LobbyModel lobbyModel = new LobbyModel();
         var adam = lobbyModel.AddPlayer("Adam");
         var eve = lobbyModel.AddPlayer("Eve");
-        var game = lobbyModel.CreateGame("Adam's Game", "Adam", "password", 4);
+        var game = lobbyModel.CreateGame("Adam's Game", "Adam", 4, "password");
         game.AddInvite(eve);
 
         Assert.IsTrue(game.AddPlayer(eve));
@@ -72,7 +72,7 @@ public class LobbyModelTest {
         LobbyModel lobbyModel = new LobbyModel();
         lobbyModel.AddPlayer("Adam");
         var eve = lobbyModel.AddPlayer("Eve");
-        var game = lobbyModel.CreateGame("Adam's Game", "Adam", "password", 4);
+        var game = lobbyModel.CreateGame("Adam's Game", "Adam", 4, "password");
         game.AddInvite(eve);
         game.AddInvite(eve);
     }
@@ -82,7 +82,7 @@ public class LobbyModelTest {
         LobbyModel lobbyModel = new LobbyModel();
         lobbyModel.AddPlayer("Adam");
         var eve = lobbyModel.AddPlayer("Eve");
-        var game = lobbyModel.CreateGame("Adam's Game", "Adam", "password", 4);
+        var game = lobbyModel.CreateGame("Adam's Game", "Adam", 4, "password");
         game.AddInvite(eve);
         game.RemoveInvite(eve);
 
@@ -95,7 +95,7 @@ public class LobbyModelTest {
         LobbyModel lobbyModel = new LobbyModel();
         lobbyModel.AddPlayer("Adam");
         var eve = new Player("eve");
-        var game = lobbyModel.CreateGame("Adam's Game", "Adam", "password", 4);
+        var game = lobbyModel.CreateGame("Adam's Game", "Adam", 4, "password");
         game.RemoveInvite(eve);
 
         Assert.IsFalse(game.AddPlayer(eve));
@@ -108,8 +108,8 @@ public class LobbyModelTest {
         LobbyModel lobbyModel = new LobbyModel();
         lobbyModel.AddPlayer("Adam");
         lobbyModel.AddPlayer("Eve");
-        lobbyModel.CreateGame("Game Name", "Adam", "password", 4);
-        lobbyModel.CreateGame("Game Name", "Eve", "password", 4);
+        lobbyModel.CreateGame("Game Name", "Adam", 4, "password");
+        lobbyModel.CreateGame("Game Name", "Eve", 4, "password");
     }
 
     // One player can not start 2 games.
@@ -118,8 +118,8 @@ public class LobbyModelTest {
     public void create_game_same_owner() {
         LobbyModel lobbyModel = new LobbyModel();
         lobbyModel.AddPlayer("Adam");
-        lobbyModel.CreateGame("Adam's Game", "Adam", "password", 4);
-        lobbyModel.CreateGame("Adam's Other Game", "Adam", "password", 4);
+        lobbyModel.CreateGame("Adam's Game", "Adam", 4, "password");
+        lobbyModel.CreateGame("Adam's Other Game", "Adam", 4, "password");
     }
 
     // Game can not be less than 2 players
@@ -128,7 +128,7 @@ public class LobbyModelTest {
     public void too_few_players() {
         LobbyModel lobbyModel = new LobbyModel();
         lobbyModel.AddPlayer("Adam");
-        lobbyModel.CreateGame("Adam's Game", "Adam", "password", 1);
+        lobbyModel.CreateGame("Adam's Game", "Adam", 1, "password");
     }
 
     // Game can not be more than 5 players
@@ -137,7 +137,7 @@ public class LobbyModelTest {
     public void too_many_players() {
         LobbyModel lobbyModel = new LobbyModel();
         lobbyModel.AddPlayer("Adam");
-        lobbyModel.CreateGame("Adam's Game", "Adam", "password", 6);
+        lobbyModel.CreateGame("Adam's Game", "Adam", 6, "password");
     }
 
     // 2 Players is permitted
@@ -145,7 +145,7 @@ public class LobbyModelTest {
     public void player_count_min() {
         LobbyModel lobbyModel = new LobbyModel();
         lobbyModel.AddPlayer("Adam");
-        lobbyModel.CreateGame("Adam's Game", "Adam", "password", 2);
+        lobbyModel.CreateGame("Adam's Game", "Adam", 2, "password");
 
         bool actual = lobbyModel.Players["Adam"].HasGame;
         bool expected = true;
@@ -157,7 +157,7 @@ public class LobbyModelTest {
     public void player_count_max() {
         LobbyModel lobbyModel = new LobbyModel();
         lobbyModel.AddPlayer("Adam");
-        lobbyModel.CreateGame("Adam's Game", "Adam", "password", 5);
+        lobbyModel.CreateGame("Adam's Game", "Adam", 5, "password");
 
         bool actual = lobbyModel.Players["Adam"].HasGame;
         bool expected = true;
@@ -168,7 +168,7 @@ public class LobbyModelTest {
     public void contains_game_true() {
         LobbyModel lobbyModel = new LobbyModel();
         lobbyModel.AddPlayer("Adam");
-        lobbyModel.CreateGame("Adam's Game", "Adam", "password", 5);
+        lobbyModel.CreateGame("Adam's Game", "Adam", 5, "password");
 
         bool actual = lobbyModel.HasGame("Adam's Game");
         bool expected = true;
@@ -179,7 +179,7 @@ public class LobbyModelTest {
     public void contains_game_false() {
         LobbyModel lobbyModel = new LobbyModel();
         lobbyModel.AddPlayer("Adam");
-        lobbyModel.CreateGame("Adam's Game", "Adam", "password", 5);
+        lobbyModel.CreateGame("Adam's Game", "Adam", 5, "password");
 
         bool actual = lobbyModel.HasGame("Eve's Game");
         bool expected = false;
@@ -200,7 +200,7 @@ public class LobbyModelTest {
     public void get_game_by_name() {
         LobbyModel lobbyModel = new LobbyModel();
         lobbyModel.AddPlayer("Adam");
-        lobbyModel.CreateGame("Adam's Game", "Adam", "password", 2);
+        lobbyModel.CreateGame("Adam's Game", "Adam", 2, "password");
         Game game = lobbyModel.GetGame("Adam's Game");
         string actual = game.Name;
         string expected = "Adam's Game";
@@ -236,10 +236,10 @@ public class LobbyModelTest {
         lobbyModel.AddPlayer("Eve");
         lobbyModel.AddPlayer("Cain");
         lobbyModel.AddPlayer("Able");
-        lobbyModel.CreateGame("Adam's Game", "Adam", "password", 2);
-        lobbyModel.CreateGame("Eve's Game", "Eve", "password", 2);
-        lobbyModel.CreateGame("Cain's Game", "Cain", "password", 2);
-        lobbyModel.CreateGame("Able's Game", "Able", "password", 2);
+        lobbyModel.CreateGame("Adam's Game", "Adam", 2, "password");
+        lobbyModel.CreateGame("Eve's Game", "Eve", 2, "password");
+        lobbyModel.CreateGame("Cain's Game", "Cain", 2, "password");
+        lobbyModel.CreateGame("Able's Game", "Able", 2, "password");
         Dictionary<string, Game> games = lobbyModel.Games;
 
         var actual = games.Count;
@@ -284,7 +284,7 @@ public class LobbyModelTest {
     public void has_game_true() {
         LobbyModel lobbyModel = new LobbyModel();
         lobbyModel.AddPlayer("Adam");
-        lobbyModel.CreateGame("Adam's Game", "Adam", "password", 2);
+        lobbyModel.CreateGame("Adam's Game", "Adam", 2, "password");
 
         Assert.IsTrue(lobbyModel.HasGame("Adam's Game"));
     }

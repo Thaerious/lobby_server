@@ -44,12 +44,12 @@ public class LobbyModel {
         players.Remove(name);
     }
 
-    public Game CreateGame(string gameName, string ownerName, string password, int maxplayers) {
+    public Game CreateGame(string gameName, string ownerName, int maxplayers, string password) {
         if (!this.HasPlayer(ownerName)) throw new UnknownPlayerException(ownerName);
         if (this.players[ownerName].HasGame) throw new PlayerInGameException(ownerName);
         if (games.ContainsKey(gameName)) throw new GameNameException(gameName);
 
-        Game game = new Game(gameName, Players[ownerName], password, maxplayers);
+        Game game = new Game(gameName, Players[ownerName], maxplayers, password);
         this.games.Add(gameName, game);
         this.players.Remove(ownerName);
         this.players[ownerName] = new Player(ownerName, game);

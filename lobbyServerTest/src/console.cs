@@ -11,4 +11,4 @@ Console.WriteLine(y);
 
 LobbyModel lobbyModel = new LobbyModel();
 lobbyModel.AddPlayer("Adam");
-lobbyModel.CreateGame("Adam's Game", "Adam", "password", 4);
+lobbyModel.CreateGame("Adam's Game", "Adam", 4, "password");

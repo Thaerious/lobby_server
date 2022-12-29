@@ -13,11 +13,12 @@ public class LobbyRouter : ThreadedRouter {
             var packet = new Packet("RegisterRejected");
             packet["reason"] = "username already in use";
             this.Connection.Write(packet);
-        } else {
+        }
+        else {
             dbi.RegisterPlayer(name, password, email);
             var packet = new Packet("RegisterAccepted");
             this.Connection.Write(packet);
-        }        
+        }
     }
 
     [Route]
@@ -32,7 +33,8 @@ public class LobbyRouter : ThreadedRouter {
             this.Connection.Write(globalPacket);
 
             this.player = model.AddPlayer(name);
-        } else {
+        }
+        else {
             var packet = new Packet("LoginRejected");
             this.Connection.Write(packet);
         }
@@ -52,7 +54,8 @@ public class LobbyRouter : ThreadedRouter {
             this.Connection.Write(globalPacket);
 
             this.player = model.AddPlayer(name);
-        } else {
+        }
+        else {
             var packet = new Packet("LoginRejected");
             this.Connection.Write(packet);
         }
@@ -66,13 +69,48 @@ public class LobbyRouter : ThreadedRouter {
 
             var globalPacket = new Packet("LeaveLobby");
             globalPacket["playername"] = player.Name;
-            this.Connection.Write(globalPacket);    
+            this.Connection.Write(globalPacket);
 
             model.RemovePlayer(player.Name);
-        } else {
+        }
+        else {
             var packet = new Packet("LogoutRejected");
             packet["reason"] = $"client not logged in";
             this.Connection.Write(packet);
         }
-    }    
+    }
+
+    [Route]
+    public void CreateGame(string gamename, int maxplayers, string password = "") {
+        if (player == null) {
+            var packet = new Packet("CreateRejected");
+            packet["reason"] = $"client not logged in";
+            this.Connection.Write(packet);
+        }
+        else if (!Game.CheckName(gamename)) {
+            var packet = new Packet("CreateRejected");
+            packet["reason"] = $"invalid name";
+            this.Connection.Write(packet);
+        }
+        else if (player.HasGame) {
+            var packet = new Packet("CreateRejected");
+            packet["reason"] = $"player already in game";
+            this.Connection.Write(packet);
+        }
+        else if (this.model.Games.Keys.Contains("name")) {
+            var packet = new Packet("CreateRejected");
+            packet["reason"] = $"game name already in use";
+            this.Connection.Write(packet);
+        }
+        else {
+            Game game = new Game(gamename, player, maxplayers, password);
+
+            var clientPacket = new Packet("CreateAccepted");
+            this.Connection.Write(clientPacket);
+
+            var globalPacket1 = new Packet("NewGame");
+            this.Connection.Write(globalPacket1);
+
+        }
+    }
 }
