@@ -17,13 +17,14 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Content Include="config.json">
-      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-    </Content>
+    <ProjectReference Include="..\lobbyServer\LobbyServer.csproj" />
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\lobbyServer\LobbyServer.csproj" />
+    <ContentWithTargetPath Include=".env">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <TargetPath>%(Filename)%(Extension)</TargetPath>
+    </ContentWithTargetPath>
   </ItemGroup>
 
 </Project>

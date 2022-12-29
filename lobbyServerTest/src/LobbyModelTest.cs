@@ -15,7 +15,7 @@ namespace frar.lobbyserver.test;
 /// dotnet test --collect:"XPlat Code Coverage"
 /// 
 /// Generate coverage reports
-/// reportgenerator -reports:frarClientServerTest/TestResults/**/*.xml -targetdir:"coverage" -reporttypes:Html
+/// reportgenerator -reports:lobbyServerTest/TestResults/**/*.xml -targetdir:"coverage" -reporttypes:Html
 /// </summary>
 [TestClass]
 public class LobbyModelTest {
@@ -58,12 +58,12 @@ public class LobbyModelTest {
     [TestMethod]
     public void add_invited_player() {
         LobbyModel lobbyModel = new LobbyModel();
-        lobbyModel.AddPlayer("Adam");
+        var adam = lobbyModel.AddPlayer("Adam");
         var eve = lobbyModel.AddPlayer("Eve");
         var game = lobbyModel.CreateGame("Adam's Game", "Adam", "password", 4);
-        game.AddInvite(eve.Name);
+        game.AddInvite(eve);
 
-        Assert.IsTrue(game.AddPlayer("Eve"));
+        Assert.IsTrue(game.AddPlayer(eve));
     }
 
     [TestMethod]
@@ -73,8 +73,8 @@ public class LobbyModelTest {
         lobbyModel.AddPlayer("Adam");
         var eve = lobbyModel.AddPlayer("Eve");
         var game = lobbyModel.CreateGame("Adam's Game", "Adam", "password", 4);
-        game.AddInvite(eve.Name);
-        game.AddInvite(eve.Name);
+        game.AddInvite(eve);
+        game.AddInvite(eve);
     }
 
     [TestMethod]
@@ -83,10 +83,10 @@ public class LobbyModelTest {
         lobbyModel.AddPlayer("Adam");
         var eve = lobbyModel.AddPlayer("Eve");
         var game = lobbyModel.CreateGame("Adam's Game", "Adam", "password", 4);
-        game.AddInvite(eve.Name);
-        game.RemoveInvite(eve.Name);
+        game.AddInvite(eve);
+        game.RemoveInvite(eve);
 
-        Assert.IsFalse(game.AddPlayer("Eve"));
+        Assert.IsFalse(game.AddPlayer(eve));
     }
 
     [TestMethod]
@@ -94,10 +94,11 @@ public class LobbyModelTest {
     public void uninvite_unknown_player() {
         LobbyModel lobbyModel = new LobbyModel();
         lobbyModel.AddPlayer("Adam");
+        var eve = new Player("eve");
         var game = lobbyModel.CreateGame("Adam's Game", "Adam", "password", 4);
-        game.RemoveInvite("Eve");
+        game.RemoveInvite(eve);
 
-        Assert.IsFalse(game.AddPlayer("Eve"));
+        Assert.IsFalse(game.AddPlayer(eve));
     }
 
     // The lobby can not have repeated game names.
@@ -146,7 +147,7 @@ public class LobbyModelTest {
         lobbyModel.AddPlayer("Adam");
         lobbyModel.CreateGame("Adam's Game", "Adam", "password", 2);
 
-        bool actual = lobbyModel.Players["Adam"].HasGame();
+        bool actual = lobbyModel.Players["Adam"].HasGame;
         bool expected = true;
         Assert.AreEqual(expected, actual);
     }
@@ -158,7 +159,7 @@ public class LobbyModelTest {
         lobbyModel.AddPlayer("Adam");
         lobbyModel.CreateGame("Adam's Game", "Adam", "password", 5);
 
-        bool actual = lobbyModel.Players["Adam"].HasGame();
+        bool actual = lobbyModel.Players["Adam"].HasGame;
         bool expected = true;
         Assert.AreEqual(expected, actual);
     }
