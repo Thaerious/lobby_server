@@ -21,6 +21,7 @@ namespace frar.lobbyserver.test;
 /// </summary>
 [TestClass]
 public class DatabaseInterfaceTest {
+    static DatabaseInterface? dbi;
 
     [ClassInitialize]
     public static void before(TestContext context) {
@@ -34,44 +35,38 @@ public class DatabaseInterfaceTest {
             database={env["SQL_DB"]}
         ";
 
-        using (var conn = new MySqlConnection(cs)) {
-            conn.Open();
-            string sql = "delete from users";
-            var cmd = new MySqlCommand(sql, conn);
-            cmd.ExecuteNonQuery();
-        }
+        dbi = new DatabaseInterface();
+        dbi.CreateTables(userTable: "test_users", sessionTable: "test_sessions");
+    }
+
+    [TestInitialize]
+    public void testInitialize() {
+        dbi!.ClearAll();
     }
 
     [TestMethod]
     public void register_new_player() {
-        var dbi = new DatabaseInterface();
-        bool result = dbi.RegisterPlayer("whoami", "super secret", "who@ami");
-        dbi.DeleteRegistration("whoami");
+        bool result = dbi!.RegisterPlayer("whoami", "super secret", "who@ami");
         Assert.AreEqual(true, result);
     }
 
     [TestMethod]
     public void verify_password_pass() {
-        var dbi = new DatabaseInterface();
-        bool r = dbi.RegisterPlayer("whoami", "super secret", "who@ami");
+        bool r = dbi!.RegisterPlayer("whoami", "super secret", "who@ami");
         var result = dbi.Verify("whoami", "super secret");
-        dbi.DeleteRegistration("whoami");
         Assert.AreEqual(true, result);
     }
 
     [TestMethod]
     public void verify_password_fail() {
-        var dbi = new DatabaseInterface();
-        bool r = dbi.RegisterPlayer("whoami", "super secret", "who@ami");
+        bool r = dbi!.RegisterPlayer("whoami", "super secret", "who@ami");
         var result = dbi.Verify("whoami", "i dunno");
-        dbi.DeleteRegistration("whoami");
         Assert.AreEqual(false, result);
     }
 
     [TestMethod]
     public void has_username_true() {
-        var dbi = new DatabaseInterface();
-        bool r = dbi.RegisterPlayer("whoami", "super secret", "who@ami");
+        bool r = dbi!.RegisterPlayer("whoami", "super secret", "who@ami");
         var result = dbi.HasUsername("whoami");
         dbi.DeleteRegistration("whoami");
         Assert.AreEqual(true, result);
@@ -79,38 +74,35 @@ public class DatabaseInterfaceTest {
 
     [TestMethod]
     public void has_username_false() {
-        var dbi = new DatabaseInterface();
-        bool r = dbi.RegisterPlayer("whoami", "super secret", "who@ami");
+        bool r = dbi!.RegisterPlayer("whoami", "super secret", "who@ami");
         var result = dbi.HasUsername("wrong");
-        dbi.DeleteRegistration("whoami");
         Assert.AreEqual(false, result);
     }
 
     [TestMethod]
     public void assign_session() {
-        var dbi = new DatabaseInterface();
-        bool r = dbi.RegisterPlayer("whoami", "super secret", "who@ami");
+        bool r = dbi!.RegisterPlayer("whoami", "super secret", "who@ami");
         var result = dbi.AssignSession("whoami");
-        dbi.DeleteRegistration("whoami");
+        Assert.IsNotNull(result);
     }
 
     [TestMethod]
     public void verify_session() {
-        var dbi = new DatabaseInterface();
-        bool r = dbi.RegisterPlayer("whoami", "super secret", "who@ami");
+        bool r = dbi!.RegisterPlayer("whoami", "super secret", "who@ami");
         var hash = dbi.AssignSession("whoami");
         var result = dbi.VerifySession(hash);
         Assert.AreEqual("whoami", result);
     }
 
     [TestMethod]
+    [ExpectedException(typeof(InvalidSessionException))]
     public void verify_session_expired() {
-        var dbi = new DatabaseInterface();
-        dbi.ClearAll();
-        DatabaseInterface.HASH_EXPIRY_HOURS = 0;
+        var dbi = new DatabaseInterface(hashExpiry : 0);
+        dbi.CreateTables(userTable: "test_users", sessionTable: "test_sessions");
+        dbi.ClearAll();        
+
         bool r = dbi.RegisterPlayer("whoami", "super secret", "who@ami");
         var hash = dbi.AssignSession("whoami");
-        var result = dbi.VerifySession(hash);
-        Assert.AreEqual("", result);
+        var result = dbi.VerifySession(hash);      
     }
 }

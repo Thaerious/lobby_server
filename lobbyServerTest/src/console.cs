@@ -3,12 +3,10 @@ using System;
 using frar.lobbyserver;
 using System.Diagnostics;
 using System.IO;
+using frar.lobbyserver.test;
 
-var x = System.AppDomain.CurrentDomain.BaseDirectory;
-var y = Environment.CurrentDirectory;
-Console.WriteLine(x);
-Console.WriteLine(y);
+var router = new LobbyRouter();
 
-LobbyModel lobbyModel = new LobbyModel();
-lobbyModel.AddPlayer("Adam");
-lobbyModel.CreateGame("Adam's Game", "Adam", 4, "password");
+var dbi = new DatabaseInterface();
+dbi.CreateTables(userTable: "test_users", sessionTable: "test_sessions");
+dbi.DropTables();

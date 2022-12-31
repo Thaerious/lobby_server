@@ -119,6 +119,10 @@ public class LobbyRouterTest {
         Assert.IsNotNull(clientPacket);
     }
 
+    /// <summary>
+    /// Login with credentials then logout.
+    /// Relogin with the session hash.
+    /// </summary>
     [TestMethod]
     public void login_session_accept() {
         var router = new LobbyRouter();
@@ -139,6 +143,11 @@ public class LobbyRouterTest {
 
         router.Logout();
         router.LoginSession(hash!);
+        
+        var rej = conn.Get("LoginRejected");
+        if (rej != null) System.Console.WriteLine(rej.ToString());
+
+        conn.AvailablePackets().ForEach(s => System.Console.WriteLine(s));
 
         var clientPacket = conn.Get("LoginAccepted");
         var globalPacket = conn.Get("PlayerLogin");
@@ -149,11 +158,13 @@ public class LobbyRouterTest {
         Assert.AreEqual("whoami", globalPacket!["playername"]);
     }
 
+    /// <summary>
+    /// This test passes in an incorrect hash for the session verification.
+    /// </summary>
     [TestMethod]
     public void login_session_reject() {
         var router = new LobbyRouter();
-        var dbi = new DatabaseInterface();
-        DatabaseInterface.HASH_EXPIRY_HOURS = 0;
+        var dbi = new DatabaseInterface(hashExpiry : 0);
         var conn = new TestConnection();
         router.Connection = conn;
 
@@ -166,16 +177,13 @@ public class LobbyRouterTest {
         conn.Get("PlayerLogin");
 
         Assert.IsNotNull(loginPacket);
-        string hash = (string)(loginPacket["hash"]);
+        string hash = (string)("I ain't no hash");
 
         router.Logout();
         router.LoginSession(hash!);
 
-        var clientPacket = conn.Get("LoginRejected");
-
-        Assert
-
-        .IsNotNull(clientPacket);
+        conn.AvailablePackets().ForEach(s => System.Console.WriteLine(s));
+        Assert.IsNotNull(conn.Get("LoginRejected"));
     }
 }
 
@@ -193,19 +201,16 @@ public class LobbyRouterTest {
 /// </summary>
 [TestClass]
 public class CreateGameTest {
-
-
-
     /// <summary>
     /// Creating a game will send packet to user.
-    /// Not including a password is undefined.
+    /// The password on the packet will be undefined.
     /// </summary> 
     [TestMethod]
     public void create_game_without_password() {
         var router = new LobbyRouter();
         new DatabaseInterface().ClearAll();
         var conn = new TestConnection();
-        router.Connection = conn;       
+        router.Connection = conn;
 
         router.RegisterPlayer("whoami", "super secret", "who@ami");
         router.Login("whoami", "super secret");
@@ -213,8 +218,14 @@ public class CreateGameTest {
 
         var createGamePacket = conn.Get("CreateAccepted");
         Assert.IsNotNull(createGamePacket);
-        Assert.Equals("my game", createGamePacket["gamename"]);
-        Assert.Equals(4, createGamePacket["maxplayers"]);
+        Assert.AreEqual("my game", createGamePacket["gamename"]);
+
+        var newGamePacket = conn.Get("NewGame");
+        Game game = (Game)(newGamePacket!.Get<Game>("game"));
+        Assert.IsNotNull(game);
+
+        Assert.AreEqual(null, game.Password); // password is not sent in packet
+        Assert.IsFalse(game.PasswordRequired);
     }
 
     /// <summary>
@@ -230,12 +241,18 @@ public class CreateGameTest {
 
         router.RegisterPlayer("whoami", "super secret", "who@ami");
         router.Login("whoami", "super secret");
-        router.CreateGame("my game", 4, "game password");
+        router.CreateGame("my game", 4, "game pw");
 
         var createGamePacket = conn.Get("CreateAccepted");
         Assert.IsNotNull(createGamePacket);
-        Assert.Equals("my game", createGamePacket["gamename"]);
-        Assert.Equals(4, createGamePacket["maxplayers"]);
+        Assert.AreEqual("my game", createGamePacket["gamename"]);
+
+        var newGamePacket = conn.Get("NewGame");
+        Game game = (Game)(newGamePacket!.Get<Game>("game"));
+        Assert.IsNotNull(game);
+
+        Assert.AreEqual(null, game.Password); // password is not sent in packet
+        Assert.IsTrue(game.PasswordRequired);
     }    
 }
 
@@ -251,7 +268,7 @@ class TestConnection : IConnection {
     }
 
     public void Write(Packet packet) {
-        Packets.Add(packet);
+        Packets.Add(Packet.FromString(packet.ToString()));        
     }
 
     public Packet? Get(string action) {
@@ -262,5 +279,14 @@ class TestConnection : IConnection {
             }
         }
         return null;
+    }
+
+    public List<string> AvailablePackets() {
+        var available = new List<string>();
+
+        foreach (Packet packet in this.Packets) {
+            available.Add(packet.Action);
+        }
+        return available;
     }
 }

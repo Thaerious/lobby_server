@@ -1,6 +1,6 @@
 using Microsoft.VisualStudio.TestTools.UnitTesting;
-using frar.lobbyserver;
 using System.Collections.Generic;
+using static frar.lobbyserver.LobbyModel;
 
 namespace frar.lobbyserver.test;
 
@@ -52,7 +52,15 @@ public class LobbyModelTest {
     public void create_game_sanity() {
         LobbyModel lobbyModel = new LobbyModel();
         lobbyModel.AddPlayer("Adam");
+        Assert.IsNotNull(lobbyModel.GetPlayer("Adam"));  
         lobbyModel.CreateGame("Adam's Game", "Adam", 4, "password");
+    }
+
+    [TestMethod]
+    public void add_then_get_player() {
+        LobbyModel lobbyModel = new LobbyModel();
+        lobbyModel.AddPlayer("Adam");
+        Assert.IsNotNull(lobbyModel.GetPlayer("Adam"));        
     }
 
     [TestMethod]
@@ -61,9 +69,9 @@ public class LobbyModelTest {
         var adam = lobbyModel.AddPlayer("Adam");
         var eve = lobbyModel.AddPlayer("Eve");
         var game = lobbyModel.CreateGame("Adam's Game", "Adam", 4, "password");
-        game.AddInvite(eve);
+        game.AddInvite("eve");
 
-        Assert.IsTrue(game.AddPlayer(eve));
+        Assert.IsTrue(game.AddPlayer("eve"));
     }
 
     [TestMethod]
@@ -73,8 +81,8 @@ public class LobbyModelTest {
         lobbyModel.AddPlayer("Adam");
         var eve = lobbyModel.AddPlayer("Eve");
         var game = lobbyModel.CreateGame("Adam's Game", "Adam", 4, "password");
-        game.AddInvite(eve);
-        game.AddInvite(eve);
+        game.AddInvite("eve");
+        game.AddInvite("eve");
     }
 
     [TestMethod]
@@ -83,10 +91,10 @@ public class LobbyModelTest {
         lobbyModel.AddPlayer("Adam");
         var eve = lobbyModel.AddPlayer("Eve");
         var game = lobbyModel.CreateGame("Adam's Game", "Adam", 4, "password");
-        game.AddInvite(eve);
-        game.RemoveInvite(eve);
+        game.AddInvite("eve");
+        game.RemoveInvite("eve");
 
-        Assert.IsFalse(game.AddPlayer(eve));
+        Assert.IsFalse(game.AddPlayer("eve"));
     }
 
     [TestMethod]
@@ -96,9 +104,9 @@ public class LobbyModelTest {
         lobbyModel.AddPlayer("Adam");
         var eve = new Player("eve");
         var game = lobbyModel.CreateGame("Adam's Game", "Adam", 4, "password");
-        game.RemoveInvite(eve);
+        game.RemoveInvite("eve");
 
-        Assert.IsFalse(game.AddPlayer(eve));
+        Assert.IsFalse(game.AddPlayer("eve"));
     }
 
     // The lobby can not have repeated game names.
