@@ -21,6 +21,19 @@ namespace frar.lobbyserver.test;
 /// </summary>
 [TestClass]
 public class LobbyRouterTest {
+    static DatabaseInterface? dbi;
+
+    [ClassInitialize]
+    public static void before(TestContext context) {
+        dbi = new DatabaseInterface();
+        dbi.CreateTables(userTable: "test_users", sessionTable: "test_sessions");
+    }
+
+    [TestInitialize]
+    public void testInitialize() {
+        dbi!.ClearAll();
+    }
+
     [TestMethod]
     public void register_new_player() {
         var router = new LobbyRouter();
@@ -248,8 +261,13 @@ public class CreateGameTest {
         Assert.AreEqual("my game", createGamePacket["gamename"]);
 
         var newGamePacket = conn.Get("NewGame");
+
+System.Console.WriteLine(newGamePacket!["game"]);
+
         Game game = (Game)(newGamePacket!.Get<Game>("game"));
         Assert.IsNotNull(game);
+
+System.Console.WriteLine(game);
 
         Assert.AreEqual(null, game.Password); // password is not sent in packet
         Assert.IsTrue(game.PasswordRequired);
@@ -275,6 +293,15 @@ class TestConnection : IConnection {
         foreach (Packet packet in this.Packets) {
             if (packet.Action == action) {
                 this.Packets.Remove(packet);
+                return packet;
+            }
+        }
+        return null;
+    }
+
+    public Packet? Peek(string action) {
+        foreach (Packet packet in this.Packets) {
+            if (packet.Action == action) {
                 return packet;
             }
         }

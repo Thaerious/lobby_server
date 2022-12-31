@@ -25,16 +25,6 @@ public class DatabaseInterfaceTest {
 
     [ClassInitialize]
     public static void before(TestContext context) {
-        DotEnv.Load();
-        var env = Environment.GetEnvironmentVariables();
-
-        string cs = @$"
-            server={env["SQL_SERVER"]};
-            userid={env["SQL_USER"]};
-            password={env["SQL_PW"]};
-            database={env["SQL_DB"]}
-        ";
-
         dbi = new DatabaseInterface();
         dbi.CreateTables(userTable: "test_users", sessionTable: "test_sessions");
     }
