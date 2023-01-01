@@ -31,104 +31,71 @@ public class LobbyRouterTest {
 
     [TestInitialize]
     public void testInitialize() {
-        dbi!.ClearAll();
+        var dbi = new DatabaseInterface();
+        dbi.ClearAll();
+        LobbyRouter.sharedModel = new LobbyModel();
     }
 
     [TestMethod]
     public void register_new_player() {
-        var router = new LobbyRouter();
-        var dbi = new DatabaseInterface();
-        var conn = new TestConnection();
-        router.Connection = conn;
-
-        dbi.ClearAll();
-
-        router.RegisterPlayer("whoami", "super secret", "who@ami");
-        Assert.IsNotNull(conn.Get("RegisterAccepted"));
+        var adam = new User("adam");
+        adam.router.RegisterPlayer("adam", "super secret", "who@ami");
+        Assert.IsNotNull(adam.conn.Get("RegisterAccepted"));
     }
 
     [TestMethod]
     public void register_new_player_reject_repeat() {
-        var router = new LobbyRouter();
-        var dbi = new DatabaseInterface();
-        var conn = new TestConnection();
-        router.Connection = conn;
-
-        dbi.ClearAll();
-
-        router.RegisterPlayer("whoami", "super secret", "who@ami");
-        router.RegisterPlayer("whoami", "super secret", "who@ami");
-        Assert.IsNotNull(conn.Get("RegisterRejected"));
+        var adam = new User("adam");
+        adam.router.RegisterPlayer("adam", "super secret", "who@ami");
+        adam.router.RegisterPlayer("adam", "super secret", "who@ami");
+        Assert.IsNotNull(adam.conn.Get("RegisterRejected"));
     }
 
     [TestMethod]
     public void login_accept() {
-        var router = new LobbyRouter();
-        var dbi = new DatabaseInterface();
-        var conn = new TestConnection();
-        router.Connection = conn;
-
-        dbi.ClearAll();
-
-        router.RegisterPlayer("whoami", "super secret", "who@ami");
-        router.Login("whoami", "super secret");
-
-        var clientPacket = conn.Get("LoginAccepted");
-        var globalPacket = conn.Get("PlayerLogin");
+        var adam = new User("adam");
+        var clientPacket = adam.conn.Get("LoginAccepted");
+        var globalPacket = adam.conn.Get("PlayerLogin");
 
         Assert.IsNotNull(clientPacket);
         Assert.IsNotNull(clientPacket!["hash"]);
         Assert.IsNotNull(globalPacket);
-        Assert.AreEqual("whoami", globalPacket!["playername"]);
+        Assert.AreEqual("adam", globalPacket!["playername"]);
     }
 
     [TestMethod]
     public void login_rejected() {
-        var router = new LobbyRouter();
-        var dbi = new DatabaseInterface();
-        var conn = new TestConnection();
-        router.Connection = conn;
+        var adam = new User("adam");
+        adam.router.Login("adam", "super secret");
 
-        dbi.ClearAll();
-
-        router.Login("whoami", "super secret");
-
-        var clientPacket = conn.Get("LoginRejected");
+        var clientPacket = adam.conn.Get("LoginRejected");
         Assert.IsNotNull(clientPacket);
     }
 
     [TestMethod]
     public void logout_accepted() {
-        var router = new LobbyRouter();
-        var dbi = new DatabaseInterface();
-        var conn = new TestConnection();
-        router.Connection = conn;
+        var adam = new User("adam");
 
-        dbi.ClearAll();
+        adam.router.RegisterPlayer("adam", "super secret", "who@ami");
+        adam.router.Login("adam", "super secret");
+        adam.router.Logout();
 
-        router.RegisterPlayer("whoami", "super secret", "who@ami");
-        router.Login("whoami", "super secret");
-        router.Logout();
-
-        var clientPacket = conn.Get("LogoutAccepted");
+        var clientPacket = adam.conn.Get("LogoutAccepted");
         Assert.IsNotNull(clientPacket);
 
-        var globalPacket = conn.Get("LeaveLobby");
+        var globalPacket = adam.conn.Get("LeaveLobby");
         Assert.IsNotNull(globalPacket);
     }
 
+    /// <summary>
+    /// Can not log out a player that hasn't logged in.
+    /// </summary>
     [TestMethod]
     public void logout_rejected() {
-        var router = new LobbyRouter();
-        var dbi = new DatabaseInterface();
-        var conn = new TestConnection();
-        router.Connection = conn;
+        var adam = new User("adam", false);
+        adam.router.Logout();
 
-        dbi.ClearAll();
-
-        router.Logout();
-
-        var clientPacket = conn.Get("LogoutRejected");
+        var clientPacket = adam.conn.Get("LogoutRejected");
         Assert.IsNotNull(clientPacket);
     }
 
@@ -138,30 +105,22 @@ public class LobbyRouterTest {
     /// </summary>
     [TestMethod]
     public void login_session_accept() {
-        var router = new LobbyRouter();
-        var dbi = new DatabaseInterface();
-        var conn = new TestConnection();
-        router.Connection = conn;
+        var adam = new User("adam");
 
-        dbi.ClearAll();
+        Assert.IsNotNull(adam.conn.Peek("LoginAccepted"));
+        Assert.IsNotNull(adam.conn.Get("PlayerLogin"));
+        string hash = (string)(adam.conn.Peek("LoginAccepted")["hash"]);
 
-        router.RegisterPlayer("whoami", "super secret", "who@ami");
-        router.Login("whoami", "super secret");
+        adam.router.Logout();
+        adam.router.LoginSession(hash!);
 
-        Assert.IsNotNull(conn.Peek("LoginAccepted"));
-        Assert.IsNotNull(conn.Get("PlayerLogin"));
-        string hash = (string)(conn.Peek("LoginAccepted")["hash"]);
-
-        router.Logout();
-        router.LoginSession(hash!);       
-
-        var clientPacket = conn.Get("LoginAccepted");
-        var globalPacket = conn.Get("PlayerLogin");
+        var clientPacket = adam.conn.Get("LoginAccepted");
+        var globalPacket = adam.conn.Get("PlayerLogin");
 
         Assert.IsNotNull(clientPacket);
         Assert.IsNotNull(clientPacket!["hash"]);
         Assert.IsNotNull(globalPacket);
-        Assert.AreEqual("whoami", globalPacket!["playername"]);
+        Assert.AreEqual("adam", globalPacket!["playername"]);
     }
 
     /// <summary>
@@ -169,27 +128,19 @@ public class LobbyRouterTest {
     /// </summary>
     [TestMethod]
     public void login_session_reject() {
-        var router = new LobbyRouter();
-        var dbi = new DatabaseInterface(hashExpiry : 0);
-        var conn = new TestConnection();
-        router.Connection = conn;
+        var adam = new User("adam");
 
-        dbi.ClearAll();
-
-        router.RegisterPlayer("whoami", "super secret", "who@ami");
-        router.Login("whoami", "super secret");
-
-        var loginPacket = conn.Get("LoginAccepted");
-        conn.Get("PlayerLogin");
+        var loginPacket = adam.conn.Get("LoginAccepted");
+        adam.conn.Get("PlayerLogin");
 
         Assert.IsNotNull(loginPacket);
         string hash = (string)("I ain't no hash");
 
-        router.Logout();
-        router.LoginSession(hash!);
+        adam.router.Logout();
+        adam.router.LoginSession(hash!);
 
-        conn.AvailablePackets().ForEach(s => System.Console.WriteLine(s));
-        Assert.IsNotNull(conn.Get("LoginRejected"));
+        adam.conn.AvailablePackets().ForEach(s => System.Console.WriteLine(s));
+        Assert.IsNotNull(adam.conn.Get("LoginRejected"));
     }
 }
 
@@ -207,27 +158,30 @@ public class LobbyRouterTest {
 /// </summary>
 [TestClass]
 public class CreateGameTest {
+    public CreateGameTest() {
+        var dbi = new DatabaseInterface();
+        dbi.CreateTables(userTable: "userTest", sessionTable: "sessionTest");
+        dbi.ClearAll();
+    }
+
+    [TestInitialize]
+    public void testInitialize() {
+        var dbi = new DatabaseInterface();
+        dbi.ClearAll();
+        LobbyRouter.sharedModel = new LobbyModel();
+    }
+
     /// <summary>
     /// Creating a game will send packet to user.
     /// The password on the packet will be undefined.
     /// </summary> 
     [TestMethod]
     public void create_game_without_password() {
-        var router = new LobbyRouter();
-        new DatabaseInterface().ClearAll();
-        var conn = new TestConnection();
-        router.Connection = conn;
+        var adam = new User("adam");
+        adam.router.CreateGame("my game", 4);
 
-        router.RegisterPlayer("whoami", "super secret", "who@ami");
-        router.Login("whoami", "super secret");
-        router.CreateGame("my game", 4);
-
-        var createGamePacket = conn.Get("CreateAccepted");
-        Assert.IsNotNull(createGamePacket);
-        Assert.AreEqual("my game", createGamePacket.Get<string>("gamename"));
-
-        var newGamePacket = conn.Get("NewGame");
-        Game game = (Game)(newGamePacket!.Get<Game>("game"));
+        Assert.AreEqual("my game", adam.conn.Get("CreateAccepted").Get<string>("gamename"));
+        Game game = (Game)(adam.conn.Get("NewGame").Get<Game>("game"));
         Assert.IsNotNull(game);
 
         Assert.AreEqual(null, game.Password); // password is not sent in packet
@@ -240,34 +194,69 @@ public class CreateGameTest {
     /// </summary> 
     [TestMethod]
     public void create_game_with_password() {
-        var router = new LobbyRouter();
-        new DatabaseInterface().ClearAll();
-        var conn = new TestConnection();
-        router.Connection = conn;       
+        var adam = new User("adam");
+        adam.router.CreateGame("my game", 4, "game pw");
 
-        router.RegisterPlayer("whoami", "super secret", "who@ami");
-        router.Login("whoami", "super secret");
-        router.CreateGame("my game", 4, "game pw");
+        if (adam.conn.Has("LoginRejected")) {
+            System.Console.WriteLine(
+                adam.conn.Get("LoginRejected")
+            );
+        }
 
-        var createGamePacket = conn.Get("CreateAccepted");
-        Assert.IsNotNull(createGamePacket);
-        Assert.AreEqual("my game", createGamePacket["gamename"]);
-
-        var newGamePacket = conn.Get("NewGame");
-
-System.Console.WriteLine(newGamePacket!["game"]);
-
-        Game game = (Game)(newGamePacket!.Get<Game>("game"));
+        Assert.AreEqual("my game", adam.conn.Get("CreateAccepted")["gamename"]);
+        Game game = (Game)(adam.conn.Get("NewGame").Get<Game>("game"));
         Assert.IsNotNull(game);
-
-System.Console.WriteLine(game);
 
         Assert.AreEqual(null, game.Password); // password is not sent in packet
         Assert.IsTrue(game.PasswordRequired);
-    }    
+    }
+
+    [TestMethod]
+    public void create_game_not_logged_in() {
+        var adam = new User("adam", false);
+        adam.router.CreateGame("my game", 4, "game pw");
+        Assert.IsNotNull(adam.conn.Get("CreateRejected"));
+    }
+
+    [TestMethod]
+    public void create_game_twice() {
+        var adam = new User("adam");
+
+        adam.router.CreateGame("my game", 4, "game pw");
+        adam.router.CreateGame("my game", 4, "game pw");
+        Assert.IsNotNull(adam.conn.Get("CreateRejected"));
+    }
+
+    [TestMethod]
+    public void create_game_repeat_name() {
+        var adam = new User("adam");
+        var eve = new User("eve");
+
+        adam.router.CreateGame("my game", 4, "game pw");
+        eve.router.CreateGame("my game", 4, "game pw");
+        Assert.IsNotNull(eve.conn.Get("CreateRejected"));
+    }
 }
 
-class TestConnection : IConnection {
+public class User {
+    public DatabaseInterface dbi;
+    public LobbyRouter router;
+    public TestConnection conn;
+
+    public User(string name, bool login = true) {
+        dbi = new DatabaseInterface();
+        router = new LobbyRouter(dbi);
+        conn = new TestConnection();
+        router.Connection = conn;
+
+        if (login) {
+            router.RegisterPlayer(name, "super secret", "who@ami");
+            router.Login(name, "super secret");
+        }
+    }
+}
+
+public class TestConnection : IConnection {
     public List<Packet> Packets = new List<Packet>();
 
     public Packet Read() {
@@ -292,6 +281,16 @@ class TestConnection : IConnection {
 
         this.AvailablePackets().ForEach(s => System.Console.WriteLine(s));
         throw new Exception($"Unknown Packet: {action}");
+    }
+
+    public bool Has(string action) {
+        foreach (Packet packet in this.Packets) {
+            if (packet.Action == action) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     public Packet Peek(string action) {
