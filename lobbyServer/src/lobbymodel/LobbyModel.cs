@@ -1,18 +1,20 @@
+using static frar.lobbyserver.LobbyModel;
+
 namespace frar.lobbyserver;
 
 // Model for storing the current state of the Lobby.
 // Any exceptions throws should be forwarded as ActionRejected events.
-public class LobbyModel {
+public partial class LobbyModel {
     private readonly Dictionary<String, Player> players = new Dictionary<String, Player>();
     private readonly Dictionary<String, Game> games = new Dictionary<String, Game>();
 
-    public Dictionary<String, Player> Players {
+    public Dictionary<string, Player> Players {
         get {
             return new Dictionary<String, Player>(players);
         }
     }
 
-    public Dictionary<String, Game> Games {
+    public Dictionary<string, Game> Games {
         get {
             return new Dictionary<String, Game>(games);
         }
@@ -49,10 +51,9 @@ public class LobbyModel {
         if (this.players[ownerName].HasGame) throw new PlayerInGameException(ownerName);
         if (games.ContainsKey(gameName)) throw new GameNameException(gameName);
 
-        Game game = new Game(gameName, Players[ownerName], maxplayers, password);
+        Game game = new Game(gameName, ownerName, maxplayers, password);
         this.games.Add(gameName, game);
-        this.players.Remove(ownerName);
-        this.players[ownerName] = new Player(ownerName, game);
+        this.players[ownerName].Game = game.Name;
         return game;
     }
 

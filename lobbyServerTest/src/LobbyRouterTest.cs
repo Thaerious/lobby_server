@@ -148,19 +148,12 @@ public class LobbyRouterTest {
         router.RegisterPlayer("whoami", "super secret", "who@ami");
         router.Login("whoami", "super secret");
 
-        var loginPacket = conn.Get("LoginAccepted");
-        conn.Get("PlayerLogin");
-
-        Assert.IsNotNull(loginPacket);
-        string hash = (string)(loginPacket["hash"]);
+        Assert.IsNotNull(conn.Peek("LoginAccepted"));
+        Assert.IsNotNull(conn.Get("PlayerLogin"));
+        string hash = (string)(conn.Peek("LoginAccepted")["hash"]);
 
         router.Logout();
-        router.LoginSession(hash!);
-        
-        var rej = conn.Get("LoginRejected");
-        if (rej != null) System.Console.WriteLine(rej.ToString());
-
-        conn.AvailablePackets().ForEach(s => System.Console.WriteLine(s));
+        router.LoginSession(hash!);       
 
         var clientPacket = conn.Get("LoginAccepted");
         var globalPacket = conn.Get("PlayerLogin");
@@ -231,7 +224,7 @@ public class CreateGameTest {
 
         var createGamePacket = conn.Get("CreateAccepted");
         Assert.IsNotNull(createGamePacket);
-        Assert.AreEqual("my game", createGamePacket["gamename"]);
+        Assert.AreEqual("my game", createGamePacket.Get<string>("gamename"));
 
         var newGamePacket = conn.Get("NewGame");
         Game game = (Game)(newGamePacket!.Get<Game>("game"));
@@ -286,26 +279,30 @@ class TestConnection : IConnection {
     }
 
     public void Write(Packet packet) {
-        Packets.Add(Packet.FromString(packet.ToString()));        
+        Packets.Add(Packet.FromString(packet.ToString()));
     }
 
-    public Packet? Get(string action) {
+    public Packet Get(string action) {
         foreach (Packet packet in this.Packets) {
             if (packet.Action == action) {
                 this.Packets.Remove(packet);
                 return packet;
             }
         }
-        return null;
+
+        this.AvailablePackets().ForEach(s => System.Console.WriteLine(s));
+        throw new Exception($"Unknown Packet: {action}");
     }
 
-    public Packet? Peek(string action) {
+    public Packet Peek(string action) {
         foreach (Packet packet in this.Packets) {
             if (packet.Action == action) {
                 return packet;
             }
         }
-        return null;
+
+        this.AvailablePackets().ForEach(s => System.Console.WriteLine(s));
+        throw new Exception($"Unknown Packet: {action}");
     }
 
     public List<string> AvailablePackets() {

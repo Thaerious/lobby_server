@@ -4,15 +4,26 @@ using MySql.Data.MySqlClient;
 namespace frar.lobbyserver;
 
 public class DatabaseInterface {
-    public static int SALT_SIZE = 64;
-    public static int ITERATIONS = 32000;
-    public static int HASH_EXPIRY_HOURS = 12;
+    public const int SALT_SIZE = 64;
+    public const int ITERATIONS = 32000;
+    public const int HASH_EXPIRY_HOURS = 12;
 
     public delegate void SQL(MySqlConnection conn);
     private readonly string cs;
     private readonly HashAlgorithmName hashAlgorithm = HashAlgorithmName.SHA512;
+    private readonly int saltSize, iterations, hashExpiry;
 
-    public DatabaseInterface() {
+    public string UserTable = "users";
+    public string SessionTable = "sessions";
+
+    public DatabaseInterface(int saltSize = SALT_SIZE, 
+                             int iterations = ITERATIONS, 
+                             int hashExpiry = HASH_EXPIRY_HOURS
+    ){
+        this.saltSize = saltSize;
+        this.iterations = iterations;
+        this.hashExpiry = hashExpiry;
+
         DotEnv.Load();
         var env = Environment.GetEnvironmentVariables();
 
@@ -24,22 +35,70 @@ public class DatabaseInterface {
         ";
     }
 
+    public void DropTables() {
+        using (var conn = new MySqlConnection(cs)) {
+            conn.Open();
+            string sql = $"DROP TABLE {this.UserTable}";
+            var cmd = new MySqlCommand(sql, conn);
+            cmd.ExecuteNonQuery();
+        }
+
+        using (var conn = new MySqlConnection(cs)) {
+            conn.Open();
+            string sql = $"DROP TABLE {this.SessionTable}";
+            var cmd = new MySqlCommand(sql, conn);
+            cmd.ExecuteNonQuery();
+        }
+    }
+
+    public void CreateTables(string userTable = "users", string sessionTable = "sessions") {
+        this.UserTable = userTable;
+        this.SessionTable = sessionTable;
+
+        using (var conn = new MySqlConnection(cs)) {
+            conn.Open();
+            string sql = @$"
+                        CREATE TABLE if not exists {userTable}(
+                            username varchar(32),
+                            salt varchar(128),
+                            password varchar(128),
+                            iterations int,
+                            email varchar(128),
+                            status varchar(32)
+                        )";
+            var cmd = new MySqlCommand(sql, conn);
+            cmd.ExecuteNonQuery();
+        }
+
+        using (var conn = new MySqlConnection(cs)) {
+            conn.Open();
+            string sql = @$"
+                        CREATE TABLE if not exists {sessionTable}(
+                            username varchar(32),
+                            hash varchar(128),
+                            expire datetime
+                        )";
+            var cmd = new MySqlCommand(sql, conn);
+            cmd.ExecuteNonQuery();
+        }
+    }
+
     public bool RegisterPlayer(string name, string password, string email) {
-        var salt = RandomNumberGenerator.GetBytes(SALT_SIZE);
+        var salt = RandomNumberGenerator.GetBytes(this.saltSize);
 
         var hash = Rfc2898DeriveBytes.Pbkdf2(
             Encoding.UTF8.GetBytes(password),
             salt,
             ITERATIONS,
             hashAlgorithm,
-            SALT_SIZE
+            this.saltSize
         );
 
         return StoreCredentials(
             name,
             Convert.ToBase64String(salt),
             Convert.ToBase64String(hash),
-            ITERATIONS,
+            this.iterations,
             email,
             "pending"
         );
@@ -49,7 +108,7 @@ public class DatabaseInterface {
         using (var conn = new MySqlConnection(cs)) {
             conn.Open();
 
-            string sql = "INSERT INTO users(username, salt, password, iterations, email, status) values (@username, @salt, @password, @iterations, @email, @status)";
+            string sql = $"INSERT INTO {this.UserTable}(username, salt, password, iterations, email, status) values (@username, @salt, @password, @iterations, @email, @status)";
             var cmd = new MySqlCommand(sql, conn);
             cmd.Parameters.AddWithValue("@username", name);
             cmd.Parameters.AddWithValue("@salt", salt);
@@ -65,7 +124,7 @@ public class DatabaseInterface {
     public bool Verify(string username, string password) {
         using (var conn = new MySqlConnection(cs)) {
             conn.Open();
-            string sql = "SELECT * FROM users where username = @username";
+            string sql = $"SELECT * FROM {this.UserTable} where username = @username";
             var cmd = new MySqlCommand(sql, conn);
             cmd.Parameters.AddWithValue("@username", username);
 
@@ -80,9 +139,9 @@ public class DatabaseInterface {
             byte[] verifyThis = Rfc2898DeriveBytes.Pbkdf2(
                 Encoding.UTF8.GetBytes(password),
                 salt,
-                ITERATIONS,
+                this.iterations,
                 hashAlgorithm,
-                SALT_SIZE
+                this.saltSize
             );
 
             if (hash.Length != verifyThis.Length) return false;
@@ -98,7 +157,7 @@ public class DatabaseInterface {
         var conn = new MySqlConnection(cs);
         conn.Open();
 
-        string sql = "DELETE FROM users where username = @username";
+        string sql = $"DELETE FROM {this.UserTable} where username = @username";
         using var cmd = new MySqlCommand(sql, conn);
         cmd.Parameters.AddWithValue("@username", username);
 
@@ -110,7 +169,7 @@ public class DatabaseInterface {
     public bool HasUsername(string username) {
         using (var conn = new MySqlConnection(cs)) {
             conn.Open();
-            string sql = "SELECT * FROM users where username = @username";
+            string sql = $"SELECT * FROM {this.UserTable} where username = @username";
             var cmd = new MySqlCommand(sql, conn);
             cmd.Parameters.AddWithValue("@username", username);
 
@@ -123,7 +182,7 @@ public class DatabaseInterface {
         using (var conn = new MySqlConnection(cs)) {
             conn.Open();
 
-            string sql = "DELETE FROM sessions where username = @username";
+            string sql = $"DELETE FROM {this.SessionTable} where username = @username";
             var cmd = new MySqlCommand(sql, conn);
             cmd.Parameters.AddWithValue("@username", username);
             return cmd.ExecuteNonQuery() >= 1;
@@ -136,12 +195,12 @@ public class DatabaseInterface {
         var conn = new MySqlConnection(cs);
         conn.Open();
 
-        var expire = DateTime.Now.AddHours(HASH_EXPIRY_HOURS);
+        var expire = DateTime.Now.AddHours(this.hashExpiry);
         string formatForSql = expire.ToString("yyyy-MM-dd HH:mm:ss");
 
-        var hash = Convert.ToBase64String(RandomNumberGenerator.GetBytes(SALT_SIZE));
+        var hash = Convert.ToBase64String(RandomNumberGenerator.GetBytes(this.saltSize));
 
-        string sql = "INSERT INTO sessions(username, hash, expire) values (@username, @hash, @expire)";
+        string sql = $"INSERT INTO {this.SessionTable}(username, hash, expire) values (@username, @hash, @expire)";
         var cmd = new MySqlCommand(sql, conn);
         cmd.Parameters.AddWithValue("@username", username);
         cmd.Parameters.AddWithValue("@hash", hash);
@@ -149,7 +208,6 @@ public class DatabaseInterface {
 
         cmd.ExecuteNonQuery();
 
-        System.Console.WriteLine(" - " + hash);
         return hash;
     }
 
@@ -162,15 +220,20 @@ public class DatabaseInterface {
         var conn = new MySqlConnection(cs);
         conn.Open();
 
-        string sql = "SELECT * FROM sessions where hash = @hash";
+        string sql = $"SELECT * FROM {this.SessionTable} where hash = @hash";
         var cmd = new MySqlCommand(sql, conn);
         cmd.Parameters.AddWithValue("@hash", hash);
 
         MySqlDataReader reader = cmd.ExecuteReader();
-        if (!reader.HasRows) return "";
+        if (!reader.HasRows) {
+            throw new InvalidSessionException("session hash not found");
+        }
+
         reader.Read();
 
-        if (DateTime.Now > (DateTime)reader["expire"]) return "";
+        if (DateTime.Now > (DateTime)reader["expire"]) {
+            throw new InvalidSessionException("session expired");
+        }
 
         return (string)reader["username"];
     }
@@ -178,8 +241,8 @@ public class DatabaseInterface {
     public void ClearAll() {
         using (var conn = new MySqlConnection(cs)) {
             conn.Open();
-            new MySqlCommand("DELETE FROM users", conn).ExecuteNonQuery();            
-            new MySqlCommand("DELETE FROM sessions", conn).ExecuteNonQuery();            
+            new MySqlCommand($"DELETE FROM {this.UserTable}", conn).ExecuteNonQuery();
+            new MySqlCommand($"DELETE FROM {this.SessionTable}", conn).ExecuteNonQuery();
         }
     }
 }

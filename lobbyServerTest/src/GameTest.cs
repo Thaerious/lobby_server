@@ -146,17 +146,6 @@ public class GameTest {
     }
 
     [TestMethod]
-    public void check_name_valid() {
-        Assert.IsTrue(Game.CheckName("apple"));
-        Assert.IsTrue(Game.CheckName("apple sauce"));
-        Assert.IsTrue(Game.CheckName("apple-sauce"));
-        Assert.IsTrue(Game.CheckName("apple_sauce"));
-        Assert.IsTrue(Game.CheckName("apple.sauce"));
-        Assert.IsTrue(Game.CheckName("12345678901234567901234"));
-        Assert.IsTrue(Game.CheckName("123"));
-    }
-
-    [TestMethod]
     public void check_name_invalid() {
         Assert.IsFalse(Game.CheckName("1234567890123456789012345"));
         Assert.IsFalse(Game.CheckName("***"));

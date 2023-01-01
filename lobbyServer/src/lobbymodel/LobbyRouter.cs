@@ -1,11 +1,13 @@
 
 using frar.clientserver;
+using static frar.lobbyserver.LobbyModel;
+
 namespace frar.lobbyserver;
 
 public class LobbyRouter : ThreadedRouter {
     private LobbyModel model = new LobbyModel();
     private DatabaseInterface dbi = new DatabaseInterface();
-    private Player player;
+    private Player? player;
 
     [Route]
     public void RegisterPlayer(string name, string password, string email) {
@@ -40,11 +42,10 @@ public class LobbyRouter : ThreadedRouter {
         }
     }
 
-    [Route]
+[Route]
     public void LoginSession(string hash) {
-        var name = dbi.VerifySession(hash);
-
-        if (name != "") {
+        try {
+            var name = dbi.VerifySession(hash);
             var clientPacket = new Packet("LoginAccepted");
             clientPacket["hash"] = dbi.AssignSession(name);
             this.Connection.Write(clientPacket);
@@ -55,9 +56,11 @@ public class LobbyRouter : ThreadedRouter {
 
             this.player = model.AddPlayer(name);
         }
-        else {
+        catch (InvalidSessionException ex) {
             var packet = new Packet("LoginRejected");
+            packet["reason"] = ex.Message;
             this.Connection.Write(packet);
+            return;
         }
     }
 
@@ -87,30 +90,31 @@ public class LobbyRouter : ThreadedRouter {
             packet["reason"] = $"client not logged in";
             this.Connection.Write(packet);
         }
-        else if (!Game.CheckName(gamename)) {
-            var packet = new Packet("CreateRejected");
-            packet["reason"] = $"invalid name";
-            this.Connection.Write(packet);
-        }
         else if (player.HasGame) {
             var packet = new Packet("CreateRejected");
             packet["reason"] = $"player already in game";
             this.Connection.Write(packet);
         }
-        else if (this.model.Games.Keys.Contains("name")) {
+        else if (this.model.Games.Keys.Contains(gamename)) {
             var packet = new Packet("CreateRejected");
             packet["reason"] = $"game name already in use";
             this.Connection.Write(packet);
         }
-        else {
-            Game game = new Game(gamename, player, maxplayers, password);
+        else try {
+            Game game = this.model.CreateGame(gamename, player.Name, maxplayers, password);
+
+            player.Game = gamename;
 
             var clientPacket = new Packet("CreateAccepted");
+            clientPacket["gamename"] = gamename;
             this.Connection.Write(clientPacket);
 
             var globalPacket1 = new Packet("NewGame");
+            globalPacket1["game"] = game;
             this.Connection.Write(globalPacket1);
-
+        }
+        catch (LobbyModelException ex) {
+            this.Connection.Write(ex.Packet("CreateRejected"));
         }
     }
 }

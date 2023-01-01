@@ -1,8 +1,16 @@
+using frar.clientserver;
+
 namespace frar.lobbyserver;
 
 public class LobbyModelException : Exception {
     public LobbyModelException(string message) : base(message) { }
     public LobbyModelException(string message, Exception inner) : base(message, inner) { }
+
+    public Packet Packet(string action){
+            var packet = new Packet(action);
+            packet["reason"] = this.Message;
+            return packet;
+    }       
 }
 
 public class MaxPlayersException : LobbyModelException {

@@ -1,24 +1,19 @@
+using Newtonsoft.Json;
+
 namespace frar.lobbyserver;
 
-// Data class for storing a player in the LobbyModel
-public class Player {
-    public readonly string Name;
-    private Game? game;
+public partial class LobbyModel {
+    public class Player {
+        [JsonProperty] public readonly string Name = "";
+        public string Game = "";
 
-    public Game? Game{
-        get { return game; }
-        set {
-            if (value != null && this.game != null) throw new PlayerInGameException(this.Name);
-            this.game = value;
+        // JSON Constructor
+        private Player() { }
+
+        public Player(string name) {
+            this.Name = name;
         }
+
+        [JsonIgnore] public bool HasGame { get => this.Game != ""; }
     }
-
-    public Player(string name) => this.Name = name;
-
-    public Player(string name, Game game) {
-        this.Name = name; 
-        this.game = game;
-    }
-
-    public bool HasGame { get => this.game != null; }
 }
