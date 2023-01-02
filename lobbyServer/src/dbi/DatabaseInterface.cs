@@ -13,8 +13,8 @@ public class DatabaseInterface {
     private readonly HashAlgorithmName hashAlgorithm = HashAlgorithmName.SHA512;
     private readonly int saltSize, iterations, hashExpiry;
 
-    public string UserTable = "users";
-    public string SessionTable = "sessions";
+    private string UserTable = "users";
+    private string SessionTable = "sessions";
 
     public DatabaseInterface(int saltSize = SALT_SIZE, 
                              int iterations = ITERATIONS, 
@@ -51,9 +51,13 @@ public class DatabaseInterface {
         }
     }
 
-    public void CreateTables(string userTable = "users", string sessionTable = "sessions") {
+    public void SetTables(string userTable = "users", string sessionTable = "sessions") {
         this.UserTable = userTable;
-        this.SessionTable = sessionTable;
+        this.SessionTable = sessionTable;    
+    }
+
+    public void CreateTables(string userTable = "users", string sessionTable = "sessions") {
+        SetTables(userTable, sessionTable);
 
         using (var conn = new MySqlConnection(cs)) {
             conn.Open();

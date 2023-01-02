@@ -7,6 +7,45 @@ using System;
 namespace frar.lobbyserver.test;
 
 
+public class LobbyTest {
+    private DatabaseInterface dbi;
+
+    public LobbyTest() {
+        dbi = new DatabaseInterface();
+        dbi.CreateTables(userTable: "userTest", sessionTable: "sessionTest");
+        dbi.ClearAll();
+    }
+
+    [TestInitialize]
+    public void testInitialize() {
+        dbi.ClearAll();
+        LobbyRouter.sharedModel = new LobbyModel();
+    }
+
+    public User NewUser(string name, bool login = true) {
+        return new User(this, name, login);
+    }
+
+    public class User {
+        public LobbyRouter router;
+        public TestConnection conn;
+        private LobbyTest outer;
+
+        public User(LobbyTest outer, string name, bool login = true) {
+            this.outer = outer;
+            router = new LobbyRouter(outer.dbi);
+            conn = new TestConnection();
+            router.Connection = conn;
+
+            if (login) {
+                router.RegisterPlayer(name, "super secret", "who@ami");
+                router.Login(name, "super secret");
+            }
+        }
+    }
+}
+
+
 /// <summary>
 /// Test the LobbyModel class.
 /// 
@@ -20,32 +59,19 @@ namespace frar.lobbyserver.test;
 /// reportgenerator -reports:lobbyServerTest/TestResults/**/*.xml -targetdir:"coverage" -reporttypes:Html
 /// </summary>
 [TestClass]
-public class LobbyRouterTest {
+public class LobbyRouterTest : LobbyTest{
     static DatabaseInterface? dbi;
-
-    [ClassInitialize]
-    public static void before(TestContext context) {
-        dbi = new DatabaseInterface();
-        dbi.CreateTables(userTable: "test_users", sessionTable: "test_sessions");
-    }
-
-    [TestInitialize]
-    public void testInitialize() {
-        var dbi = new DatabaseInterface();
-        dbi.ClearAll();
-        LobbyRouter.sharedModel = new LobbyModel();
-    }
 
     [TestMethod]
     public void register_new_player() {
-        var adam = new User("adam");
+        var adam = NewUser("adam");
         adam.router.RegisterPlayer("adam", "super secret", "who@ami");
         Assert.IsNotNull(adam.conn.Get("RegisterAccepted"));
     }
 
     [TestMethod]
     public void register_new_player_reject_repeat() {
-        var adam = new User("adam");
+        var adam = NewUser("adam");
         adam.router.RegisterPlayer("adam", "super secret", "who@ami");
         adam.router.RegisterPlayer("adam", "super secret", "who@ami");
         Assert.IsNotNull(adam.conn.Get("RegisterRejected"));
@@ -53,7 +79,7 @@ public class LobbyRouterTest {
 
     [TestMethod]
     public void login_accept() {
-        var adam = new User("adam");
+        var adam = NewUser("adam");
         var clientPacket = adam.conn.Get("LoginAccepted");
         var globalPacket = adam.conn.Get("PlayerLogin");
 
@@ -65,7 +91,7 @@ public class LobbyRouterTest {
 
     [TestMethod]
     public void login_rejected() {
-        var adam = new User("adam");
+        var adam = NewUser("adam");
         adam.router.Login("adam", "super secret");
 
         var clientPacket = adam.conn.Get("LoginRejected");
@@ -74,7 +100,7 @@ public class LobbyRouterTest {
 
     [TestMethod]
     public void logout_accepted() {
-        var adam = new User("adam");
+        var adam = NewUser("adam");
 
         adam.router.RegisterPlayer("adam", "super secret", "who@ami");
         adam.router.Login("adam", "super secret");
@@ -92,7 +118,7 @@ public class LobbyRouterTest {
     /// </summary>
     [TestMethod]
     public void logout_rejected() {
-        var adam = new User("adam", false);
+        var adam = NewUser("adam", false);
         adam.router.Logout();
 
         var clientPacket = adam.conn.Get("LogoutRejected");
@@ -105,7 +131,7 @@ public class LobbyRouterTest {
     /// </summary>
     [TestMethod]
     public void login_session_accept() {
-        var adam = new User("adam");
+        var adam = NewUser("adam");
 
         Assert.IsNotNull(adam.conn.Peek("LoginAccepted"));
         Assert.IsNotNull(adam.conn.Get("PlayerLogin"));
@@ -128,7 +154,7 @@ public class LobbyRouterTest {
     /// </summary>
     [TestMethod]
     public void login_session_reject() {
-        var adam = new User("adam");
+        var adam = NewUser("adam");
 
         var loginPacket = adam.conn.Get("LoginAccepted");
         adam.conn.Get("PlayerLogin");
@@ -157,27 +183,14 @@ public class LobbyRouterTest {
 /// reportgenerator -reports:lobbyServerTest/TestResults/**/*.xml -targetdir:"coverage" -reporttypes:Html
 /// </summary>
 [TestClass]
-public class CreateGameTest {
-    public CreateGameTest() {
-        var dbi = new DatabaseInterface();
-        dbi.CreateTables(userTable: "userTest", sessionTable: "sessionTest");
-        dbi.ClearAll();
-    }
-
-    [TestInitialize]
-    public void testInitialize() {
-        var dbi = new DatabaseInterface();
-        dbi.ClearAll();
-        LobbyRouter.sharedModel = new LobbyModel();
-    }
-
+public class CreateGameTest : LobbyTest {
     /// <summary>
     /// Creating a game will send packet to user.
     /// The password on the packet will be undefined.
     /// </summary> 
     [TestMethod]
     public void create_game_without_password() {
-        var adam = new User("adam");
+        var adam = NewUser("adam");
         adam.router.CreateGame("my game", 4);
 
         Assert.AreEqual("my game", adam.conn.Get("CreateAccepted").Get<string>("gamename"));
@@ -194,7 +207,7 @@ public class CreateGameTest {
     /// </summary> 
     [TestMethod]
     public void create_game_with_password() {
-        var adam = new User("adam");
+        var adam = NewUser("adam");
         adam.router.CreateGame("my game", 4, "game pw");
 
         if (adam.conn.Has("LoginRejected")) {
@@ -213,14 +226,14 @@ public class CreateGameTest {
 
     [TestMethod]
     public void create_game_not_logged_in() {
-        var adam = new User("adam", false);
+        var adam = NewUser("adam", false);
         adam.router.CreateGame("my game", 4, "game pw");
         Assert.IsNotNull(adam.conn.Get("CreateRejected"));
     }
 
     [TestMethod]
     public void create_game_twice() {
-        var adam = new User("adam");
+        var adam = NewUser("adam");
 
         adam.router.CreateGame("my game", 4, "game pw");
         adam.router.CreateGame("my game", 4, "game pw");
@@ -229,30 +242,12 @@ public class CreateGameTest {
 
     [TestMethod]
     public void create_game_repeat_name() {
-        var adam = new User("adam");
-        var eve = new User("eve");
+        var adam = NewUser("adam");
+        var eve = NewUser("eve");
 
         adam.router.CreateGame("my game", 4, "game pw");
         eve.router.CreateGame("my game", 4, "game pw");
         Assert.IsNotNull(eve.conn.Get("CreateRejected"));
-    }
-}
-
-public class User {
-    public DatabaseInterface dbi;
-    public LobbyRouter router;
-    public TestConnection conn;
-
-    public User(string name, bool login = true) {
-        dbi = new DatabaseInterface();
-        router = new LobbyRouter(dbi);
-        conn = new TestConnection();
-        router.Connection = conn;
-
-        if (login) {
-            router.RegisterPlayer(name, "super secret", "who@ami");
-            router.Login(name, "super secret");
-        }
     }
 }
 
