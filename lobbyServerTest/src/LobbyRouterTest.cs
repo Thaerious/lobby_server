@@ -38,8 +38,8 @@ public class LobbyTest {
             router.Connection = conn;
 
             if (login) {
-                router.RegisterPlayer(name, "super secret", "who@ami");
-                router.Login(name, "super secret");
+                router.Process(new Packet("RegisterPlayer", name, "super secret", "who@ami"));
+                router.Process(new Packet("Login", name, "super secret"));
             }
         }
     }
@@ -59,21 +59,21 @@ public class LobbyTest {
 /// reportgenerator -reports:lobbyServerTest/TestResults/**/*.xml -targetdir:"coverage" -reporttypes:Html
 /// </summary>
 [TestClass]
-public class LobbyRouterTest : LobbyTest{
+public class LobbyRouterTest : LobbyTest {
     static DatabaseInterface? dbi;
 
     [TestMethod]
-    public void register_new_player() {
-        var adam = NewUser("adam");
-        adam.router.RegisterPlayer("adam", "super secret", "who@ami");
+    public void register_new_player_accept() {
+        var adam = NewUser("adam", false);
+        adam.router.Process(new Packet("RegisterPlayer", "adam", "super secret", "who@ami"));
         Assert.IsNotNull(adam.conn.Get("RegisterAccepted"));
     }
 
     [TestMethod]
     public void register_new_player_reject_repeat() {
-        var adam = NewUser("adam");
-        adam.router.RegisterPlayer("adam", "super secret", "who@ami");
-        adam.router.RegisterPlayer("adam", "super secret", "who@ami");
+        var adam = NewUser("adam", false);
+        adam.router.Process(new Packet("RegisterPlayer", "adam", "super secret", "who@ami"));
+        adam.router.Process(new Packet("RegisterPlayer", "adam", "super secret", "who@ami"));
         Assert.IsNotNull(adam.conn.Get("RegisterRejected"));
     }
 
@@ -92,7 +92,7 @@ public class LobbyRouterTest : LobbyTest{
     [TestMethod]
     public void login_rejected() {
         var adam = NewUser("adam");
-        adam.router.Login("adam", "super secret");
+        adam.router.Process(new Packet("Login", "adam", "super secret"));
 
         var clientPacket = adam.conn.Get("LoginRejected");
         Assert.IsNotNull(clientPacket);
@@ -102,9 +102,9 @@ public class LobbyRouterTest : LobbyTest{
     public void logout_accepted() {
         var adam = NewUser("adam");
 
-        adam.router.RegisterPlayer("adam", "super secret", "who@ami");
-        adam.router.Login("adam", "super secret");
-        adam.router.Logout();
+        adam.router.Process(new Packet("RegisterPlayer", "adam", "super secret", "who@ami"));
+        adam.router.Process(new Packet("Login", "adam", "super secret"));
+        adam.router.Process(new Packet("Logout"));
 
         var clientPacket = adam.conn.Get("LogoutAccepted");
         Assert.IsNotNull(clientPacket);
@@ -119,9 +119,9 @@ public class LobbyRouterTest : LobbyTest{
     [TestMethod]
     public void logout_rejected() {
         var adam = NewUser("adam", false);
-        adam.router.Logout();
+        adam.router.Process(new Packet("Logout"));
 
-        var clientPacket = adam.conn.Get("LogoutRejected");
+        var clientPacket = adam.conn.Get("AuthError");
         Assert.IsNotNull(clientPacket);
     }
 
@@ -137,8 +137,8 @@ public class LobbyRouterTest : LobbyTest{
         Assert.IsNotNull(adam.conn.Get("PlayerLogin"));
         string hash = (string)(adam.conn.Peek("LoginAccepted")["hash"]);
 
-        adam.router.Logout();
-        adam.router.LoginSession(hash!);
+        adam.router.Process(new Packet("Logout"));
+        adam.router.Process(new Packet("LoginSession", hash!));
 
         var clientPacket = adam.conn.Get("LoginAccepted");
         var globalPacket = adam.conn.Get("PlayerLogin");
@@ -162,8 +162,8 @@ public class LobbyRouterTest : LobbyTest{
         Assert.IsNotNull(loginPacket);
         string hash = (string)("I ain't no hash");
 
-        adam.router.Logout();
-        adam.router.LoginSession(hash!);
+        adam.router.Process(new Packet("Logout"));
+        adam.router.Process(new Packet("LoginSession", hash!));
 
         adam.conn.AvailablePackets().ForEach(s => System.Console.WriteLine(s));
         Assert.IsNotNull(adam.conn.Get("LoginRejected"));
@@ -191,7 +191,7 @@ public class CreateGameTest : LobbyTest {
     [TestMethod]
     public void create_game_without_password() {
         var adam = NewUser("adam");
-        adam.router.CreateGame("my game", 4);
+        adam.router.Process(new Packet("CreateGame", "my game", 4));
 
         Assert.AreEqual("my game", adam.conn.Get("CreateAccepted").Get<string>("gamename"));
         Game game = (Game)(adam.conn.Get("NewGame").Get<Game>("game"));
@@ -208,7 +208,7 @@ public class CreateGameTest : LobbyTest {
     [TestMethod]
     public void create_game_with_password() {
         var adam = NewUser("adam");
-        adam.router.CreateGame("my game", 4, "game pw");
+        adam.router.Process(new Packet("CreateGame", "my game", 4, "game pw"));
 
         if (adam.conn.Has("LoginRejected")) {
             System.Console.WriteLine(
@@ -227,16 +227,16 @@ public class CreateGameTest : LobbyTest {
     [TestMethod]
     public void create_game_not_logged_in() {
         var adam = NewUser("adam", false);
-        adam.router.CreateGame("my game", 4, "game pw");
-        Assert.IsNotNull(adam.conn.Get("CreateRejected"));
+        adam.router.Process(new Packet("CreateGame", "my game", 4, "game pw"));
+        Assert.IsNotNull(adam.conn.Get("AuthError"));
     }
 
     [TestMethod]
     public void create_game_twice() {
         var adam = NewUser("adam");
 
-        adam.router.CreateGame("my game", 4, "game pw");
-        adam.router.CreateGame("my game", 4, "game pw");
+        adam.router.Process(new Packet("CreateGame", "my game", 4, "game pw"));
+        adam.router.Process(new Packet("CreateGame", "my game", 4, "game pw"));
         Assert.IsNotNull(adam.conn.Get("CreateRejected"));
     }
 
@@ -245,11 +245,352 @@ public class CreateGameTest : LobbyTest {
         var adam = NewUser("adam");
         var eve = NewUser("eve");
 
-        adam.router.CreateGame("my game", 4, "game pw");
-        eve.router.CreateGame("my game", 4, "game pw");
+        adam.router.Process(new Packet("CreateGame", "my game", 4, "game pw"));
+        eve.router.Process(new Packet("CreateGame", "my game", 4, "game pw"));
         Assert.IsNotNull(eve.conn.Get("CreateRejected"));
     }
 }
+
+/// <summary>
+/// Test the JoinGame method of the LobbyRouter class.
+/// 
+/// To test just this class:
+/// dotnet test --filter ClassName=frar.lobbyserver.test.JoinGameTest
+/// 
+/// Run tests with code coverage
+/// dotnet test --collect:"XPlat Code Coverage"
+/// 
+/// Generate coverage reports
+/// reportgenerator -reports:lobbyServerTest/TestResults/**/*.xml -targetdir:"coverage" -reporttypes:Html
+/// </summary>
+[TestClass]
+public class JoinGameTest : LobbyTest {
+    /// <summary>
+    /// Join a game without a password.
+    /// Player joins a game because they are not already in a game.
+    /// - Client receives a JoinAccepted packet.
+    /// </summary>
+    [TestMethod]
+    public void player_join_no_password_accepted() {
+        var adam = NewUser("adam");
+        var eve = NewUser("eve");
+
+        adam.router.Process(new Packet("CreateGame", "adam's game", 4));
+        eve.router.Process(new Packet("JoinGame", "adam's game"));
+
+        // Client receives a JoinAccepted packet.
+        Assert.IsTrue(eve.conn.Has("JoinAccepted"));
+
+        // All players receive a PlayerJoined packet.
+        Assert.IsTrue(adam.conn.Has("PlayerJoined"));
+        Assert.IsTrue(eve.conn.Has("PlayerJoined"));
+
+        // PlayerJoined packet has gamename field
+        var packet = adam.conn.Get("PlayerJoined");
+        Assert.AreEqual("adam's game", packet.Get<string>("gamename"));
+
+        // PlayerJoined packet has playername field
+        Assert.AreEqual("eve", packet.Get<string>("playername"));
+    }
+
+    /// <summary>
+    /// Join a game without a password.
+    /// Player joins a game because they are not already in a game.
+    /// - Client receives a JoinAccepted packet.
+    /// </summary>
+    [TestMethod]
+    public void player_join_with_password_accepted() {
+        var adam = NewUser("adam");
+        var eve = NewUser("eve");
+
+        adam.router.Process(new Packet("CreateGame", "adam's game", 4, "ima password"));
+        eve.router.Process(new Packet("JoinGame", "adam's game", "ima password"));
+
+        // Client receives a JoinAccepted packet.
+        Assert.IsTrue(eve.conn.Has("JoinAccepted"));
+
+        // All players receive a PlayerJoined packet.
+        Assert.IsTrue(adam.conn.Has("PlayerJoined"));
+        Assert.IsTrue(eve.conn.Has("PlayerJoined"));
+
+        // PlayerJoined packet has gamename field
+        var packet = adam.conn.Get("PlayerJoined");
+        Assert.AreEqual("adam's game", packet.Get<string>("gamename"));
+
+        // PlayerJoined packet has playername field
+        Assert.AreEqual("eve", packet.Get<string>("playername"));
+    }
+
+    /// <summary>
+    /// Players not logged in can not join a game
+    /// </summary>
+    [TestMethod]
+    public void player_join_rejected_login() {
+        var adam = NewUser("adam");
+        var eve = NewUser("eve", login: false);
+
+        adam.router.Process(new Packet("CreateGame", "adam's game", 4));
+        eve.router.Process(new Packet("JoinGame", "adam's game"));
+
+        eve.conn.Assert("AuthError");
+    }
+
+    /// <summary>
+    /// Players can't join a game that doesn't exist
+    /// </summary>
+    [TestMethod]
+    public void player_join_rejected_unknown_game() {
+        var eve = NewUser("eve");
+        eve.router.Process(new Packet("JoinGame", "adam's game"));
+        eve.conn.Assert("JoinRejected");
+    }    
+
+    /// <summary>
+    /// Players can't join a full game
+    /// </summary>
+    [TestMethod]
+    public void player_join_rejected_full_game() {
+        var adam = NewUser("adam");
+        var eve = NewUser("eve");
+        var cain = NewUser("cain");
+
+        adam.router.Process(new Packet("CreateGame", "adam's game", 2));
+        eve.router.Process(new Packet("JoinGame", "adam's game"));
+        cain.router.Process(new Packet("JoinGame", "adam's game"));
+
+        cain.conn.Assert("JoinRejected");
+    }
+
+    /// <summary>
+    /// Players can't join multiple games
+    /// </summary>
+    [TestMethod]
+    public void player_join_rejected_already_in_game() {
+        var adam = NewUser("adam");
+        var eve = NewUser("eve");
+        var cain = NewUser("cain");
+
+        adam.router.Process(new Packet("CreateGame", "adam's game", 2));
+        eve.router.Process(new Packet("CreateGame", "eve's game", 2));
+        cain.router.Process(new Packet("JoinGame", "adam's game"));
+        cain.router.Process(new Packet("JoinGame", "eve's game"));
+
+        cain.conn.Assert("JoinRejected");
+    }    
+
+    /// <summary>
+    /// Players can't join multiple games
+    /// </summary>
+    [TestMethod]
+    public void player_join_rejected_hosting_game() {
+        var adam = NewUser("adam");
+        var eve = NewUser("eve");
+
+        adam.router.Process(new Packet("CreateGame", "adam's game", 2));
+        eve.router.Process(new Packet("CreateGame", "eve's game", 2));
+        eve.router.Process(new Packet("JoinGame", "adam's game"));
+
+        eve.conn.Assert("JoinRejected");
+    }       
+
+    /// <summary>
+    /// Passwords must match
+    /// </summary>
+    [TestMethod]
+    public void player_join_rejected_password() {
+        var adam = NewUser("adam");
+        var eve = NewUser("eve");
+
+        adam.router.Process(new Packet("CreateGame", "adam's game", 2, "password"));
+        eve.router.Process(new Packet("JoinGame", "adam's game", "wrong password"));
+
+        eve.conn.Assert("JoinRejected");
+    }        
+
+    /// <summary>
+    /// Passwords must match
+    /// </summary>
+    [TestMethod]
+    public void player_join_rejected_password_not_provided() {
+        var adam = NewUser("adam");
+        var eve = NewUser("eve");
+
+        adam.router.Process(new Packet("CreateGame", "adam's game", 2, "password"));
+        eve.router.Process(new Packet("JoinGame", "adam's game"));
+
+        eve.conn.Assert("JoinRejected");
+    }               
+}
+
+/// <summary>
+/// Test the JoinGame method of the LobbyRouter class.
+/// 
+/// To test just this class:
+/// dotnet test --filter ClassName=frar.lobbyserver.test.JoinGameTest
+/// 
+/// Run tests with code coverage
+/// dotnet test --collect:"XPlat Code Coverage"
+/// 
+/// Generate coverage reports
+/// reportgenerator -reports:lobbyServerTest/TestResults/**/*.xml -targetdir:"coverage" -reporttypes:Html
+/// </summary>
+// [TestClass]
+public class InviteTest : LobbyTest {
+    /// <summary>
+    /// Join a game without a password.
+    /// Player joins a game because they are not already in a game.
+    /// - Client receives a JoinAccepted packet.
+    /// </summary>
+    [TestMethod]
+    public void player_join_invited_with_password() {
+        var adam = NewUser("adam");
+        var eve = NewUser("eve");
+
+        adam.router.Process(new Packet("CreateGame", "adam's game", 4, "password"));
+        adam.router.Process(new Packet("InvitePlayer", "eve"));
+
+        // Client receives a InviteAccepted  packet.
+        Assert.IsTrue(eve.conn.Has("InviteAccepted"));
+
+        // Packet has invited players name
+        var packet = adam.conn.Get("InviteAccepted");
+        Assert.AreEqual("eve", packet.Get<string>("playername"));
+
+        // Invited client joins game w/o password.
+        eve.router.Process(new Packet("JoinGame", "adam's game"));
+
+        // Invited client recieves JoinAccepted packet.
+        Assert.IsTrue(eve.conn.Has("JoinAccepted"));
+    }
+
+    /// <summary>
+    /// Players can be invited w/o a password
+    /// </summary>
+    [TestMethod]
+    public void player_join_invited_without_password() {
+        var adam = NewUser("adam");
+        var eve = NewUser("eve");
+
+        adam.router.Process(new Packet("CreateGame", "adam's game", 4));
+        adam.router.Process(new Packet("InvitePlayer", "eve"));
+
+        // Client receives a InviteAccepted  packet.
+        Assert.IsTrue(eve.conn.Has("InviteAccepted"));
+
+        // Packet has invited players name
+        var packet = adam.conn.Get("InviteAccepted");
+        Assert.AreEqual("eve", packet.Get<string>("playername"));
+
+        // Invited client joins game w/o password.
+        eve.router.Process(new Packet("JoinGame", "adam's game"));
+
+        // Invited client recieves JoinAccepted packet.
+        Assert.IsTrue(eve.conn.Has("JoinAccepted"));
+    }
+
+    /// <summary>
+    /// No game exists for inviting player
+    /// </summary>
+    [TestMethod]
+    public void player_join_rejected_login() {
+        var adam = NewUser("adam");
+        var eve = NewUser("eve", login: false);
+
+        adam.router.Process(new Packet("CreateGame", "adam's game", 4));
+        eve.router.Process(new Packet("JoinGame", "adam's game"));
+
+        // Client receives a JoinRejected packet.
+        eve.conn.Assert("JoinRejected");
+    }
+
+    /// <summary>
+    /// Players can't join a game that doesn't exist
+    /// </summary>
+    [TestMethod]
+    public void player_join_rejected_unknown_game() {
+        var eve = NewUser("eve");
+        eve.router.Process(new Packet("JoinGame", "adam's game"));
+        eve.conn.Assert("JoinRejected");
+    }    
+
+    /// <summary>
+    /// Players can't join a full game
+    /// </summary>
+    [TestMethod]
+    public void player_join_rejected_full_game() {
+        var adam = NewUser("adam");
+        var eve = NewUser("eve");
+        var cain = NewUser("cain");
+
+        adam.router.Process(new Packet("CreateGame", "adam's game", 2));
+        eve.router.Process(new Packet("JoinGame", "adam's game"));
+        cain.router.Process(new Packet("JoinGame", "adam's game"));
+
+        cain.conn.Assert("JoinRejected");
+    }
+
+    /// <summary>
+    /// Players can't join multiple games
+    /// </summary>
+    [TestMethod]
+    public void player_join_rejected_already_in_game() {
+        var adam = NewUser("adam");
+        var eve = NewUser("eve");
+        var cain = NewUser("cain");
+
+        adam.router.Process(new Packet("CreateGame", "adam's game", 2));
+        eve.router.Process(new Packet("CreateGame", "eve's game", 2));
+        cain.router.Process(new Packet("JoinGame", "adam's game"));
+        cain.router.Process(new Packet("JoinGame", "eve's game"));
+
+        cain.conn.Assert("JoinRejected");
+    }    
+
+    /// <summary>
+    /// Players can't join multiple games
+    /// </summary>
+    [TestMethod]
+    public void player_join_rejected_hosting_game() {
+        var adam = NewUser("adam");
+        var eve = NewUser("eve");
+
+        adam.router.Process(new Packet("CreateGame", "adam's game", 2));
+        eve.router.Process(new Packet("CreateGame", "eve's game", 2));
+        eve.router.Process(new Packet("JoinGame", "adam's game"));
+
+        eve.conn.Assert("JoinRejected");
+    }       
+
+    /// <summary>
+    /// Passwords must match
+    /// </summary>
+    [TestMethod]
+    public void player_join_rejected_password() {
+        var adam = NewUser("adam");
+        var eve = NewUser("eve");
+
+        adam.router.Process(new Packet("CreateGame", "adam's game", 2, "password"));
+        eve.router.Process(new Packet("JoinGame", "adam's game", "wrong password"));
+
+        eve.conn.Assert("JoinRejected");
+    }        
+
+    /// <summary>
+    /// Passwords must match
+    /// </summary>
+    [TestMethod]
+    public void player_join_rejected_password_not_provided() {
+        var adam = NewUser("adam");
+        var eve = NewUser("eve");
+
+        adam.router.Process(new Packet("CreateGame", "adam's game", 2, "password"));
+        eve.router.Process(new Packet("JoinGame", "adam's game"));
+
+        eve.conn.Assert("JoinRejected");
+    }               
+}
+
+
 
 public class TestConnection : IConnection {
     public List<Packet> Packets = new List<Packet>();
@@ -278,6 +619,13 @@ public class TestConnection : IConnection {
         throw new Exception($"Unknown Packet: {action}");
     }
 
+    public Packet Pop() {
+        if (this.Packets.Count == 0) throw new Exception($"No available packets");
+        var packet = this.Packets[0];
+        this.Packets.RemoveAt(0);
+        return packet;
+    }
+
     public bool Has(string action) {
         foreach (Packet packet in this.Packets) {
             if (packet.Action == action) {
@@ -286,6 +634,13 @@ public class TestConnection : IConnection {
         }
 
         return false;
+    }
+
+    public void Assert(string action) {
+        if (!this.Has(action)) {
+            this.AvailablePackets().ForEach(s => System.Console.WriteLine(s));
+            Microsoft.VisualStudio.TestTools.UnitTesting.Assert.Fail();
+        }
     }
 
     public Packet Peek(string action) {

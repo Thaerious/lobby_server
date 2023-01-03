@@ -6,9 +6,10 @@ namespace frar.lobbyserver;
 
 public class LobbyRouter : ThreadedRouter {
     public static LobbyModel sharedModel = new LobbyModel();
+    private static List<IConnection> liveConnections = new List<IConnection>();
 
     private DatabaseInterface dbi;
-    private Player? player;
+    public Player? player = null;
 
     public LobbyRouter() {
         this.dbi = new DatabaseInterface();
@@ -16,6 +17,24 @@ public class LobbyRouter : ThreadedRouter {
 
     public LobbyRouter(DatabaseInterface dbi) {
         this.dbi = dbi;
+    }
+
+    public void Broadcast(Packet packet) {
+        foreach (IConnection connection in liveConnections) {
+            connection.Write(packet);
+        }
+    }
+
+    [Route(Rule = "(?i)^(?!(login)|(register)).*$", Index = -1)]
+    public void CheckForLogin([Ctrl] RouterController ctrl) {
+        System.Console.WriteLine(" --- Auth");
+        System.Console.WriteLine(this.player);
+        if (this.player == null) {
+            var packet = new Packet("AuthError");
+            packet["reason"] = $"client not logged in";
+            this.Connection.Write(packet);
+            ctrl.TerminateRoute = true;
+        }
     }
 
     [Route]
@@ -43,11 +62,14 @@ public class LobbyRouter : ThreadedRouter {
             clientPacket["hash"] = dbi.AssignSession(name);
             this.Connection.Write(clientPacket);
 
+            this.player = sharedModel.AddPlayer(name);
+            lock (liveConnections) {
+                liveConnections.Add(this.Connection);
+            }
+
             var globalPacket = new Packet("PlayerLogin");
             globalPacket["playername"] = name;
-            this.Connection.Write(globalPacket);
-
-            this.player = sharedModel.AddPlayer(name);
+            this.Broadcast(globalPacket);
         }
         else {
             var packet = new Packet("LoginRejected");
@@ -63,11 +85,14 @@ public class LobbyRouter : ThreadedRouter {
             clientPacket["hash"] = dbi.AssignSession(name);
             this.Connection.Write(clientPacket);
 
+            this.player = sharedModel.AddPlayer(name);
+            lock (liveConnections) {
+                liveConnections.Add(this.Connection);
+            }
+
             var globalPacket = new Packet("PlayerLogin");
             globalPacket["playername"] = name;
-            this.Connection.Write(globalPacket);
-
-            this.player = sharedModel.AddPlayer(name);
+            this.Broadcast(globalPacket);
         }
         catch (InvalidSessionException ex) {
             var packet = new Packet("LoginRejected");
@@ -79,15 +104,19 @@ public class LobbyRouter : ThreadedRouter {
 
     [Route]
     public void Logout() {
+        System.Console.WriteLine(" --- Logout");
         if (player != null && sharedModel.HasPlayer(player.Name)) {
             var clientPacket = new Packet("LogoutAccepted");
             this.Connection.Write(clientPacket);
 
             var globalPacket = new Packet("LeaveLobby");
             globalPacket["playername"] = player.Name;
-            this.Connection.Write(globalPacket);
+            this.Broadcast(globalPacket);
 
             sharedModel.RemovePlayer(player.Name);
+            lock (liveConnections) {
+                liveConnections.Remove(this.Connection);
+            }
         }
         else {
             var packet = new Packet("LogoutRejected");
@@ -98,11 +127,6 @@ public class LobbyRouter : ThreadedRouter {
 
     [Route]
     public void CreateGame(string gamename, int maxplayers, string password = "") {
-        foreach (string key in sharedModel.Games.Keys) {
-            System.Console.WriteLine(key);
-        }
-        System.Console.WriteLine("count " + sharedModel.Games.Keys.Count);
-
         if (player == null) {
             var packet = new Packet("CreateRejected");
             packet["reason"] = $"client not logged in";
@@ -121,18 +145,55 @@ public class LobbyRouter : ThreadedRouter {
         else try {
                 Game game = sharedModel.CreateGame(gamename, player.Name, maxplayers, password);
 
-                player.Game = gamename;
-
                 var clientPacket = new Packet("CreateAccepted");
                 clientPacket["gamename"] = gamename;
                 this.Connection.Write(clientPacket);
 
                 var globalPacket1 = new Packet("NewGame");
                 globalPacket1["game"] = game;
-                this.Connection.Write(globalPacket1);
+                this.Broadcast(globalPacket1); // TODO CHANGE TO BROADCAST
             }
             catch (LobbyModelException ex) {
                 this.Connection.Write(ex.Packet("CreateRejected"));
             }
+    }
+
+    [Route]
+    public void JoinGame(string gamename, string password = "") {
+        if (this.player!.HasGame) {
+            var clientPacket = new Packet("JoinRejected");
+            clientPacket["reason"] = "player already in game";
+            this.Connection.Write(clientPacket);
+        }
+        else if (sharedModel.HasGame(gamename) == false) {
+            var clientPacket = new Packet("JoinRejected");
+            clientPacket["reason"] = $"unknown game {gamename}";
+            this.Connection.Write(clientPacket);
+        }
+        else if (sharedModel.GetGame(gamename).Password != password) {
+            var clientPacket = new Packet("JoinRejected");
+            clientPacket["reason"] = "passwords do not match";
+            this.Connection.Write(clientPacket);
+        }
+        else try {
+                sharedModel.GetGame(gamename).AddPlayer(this.player.Name);
+                this.player.Game = gamename;
+
+                var clientPacket = new Packet("JoinAccepted");
+                clientPacket["gamename"] = gamename;
+                this.Connection.Write(clientPacket);
+
+                var globalPacket = new Packet("PlayerJoined");
+                globalPacket["gamename"] = gamename;
+                globalPacket["playername"] = this.player.Name;
+                this.Broadcast(globalPacket);
+            }
+            catch (LobbyModelException ex) {
+                this.Connection.Write(ex.Packet("JoinRejected"));
+            }
+    }
+
+    [Route]
+    public void InvitePlayer(string playername) {
     }
 }
