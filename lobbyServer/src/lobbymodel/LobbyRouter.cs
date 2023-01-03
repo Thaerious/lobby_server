@@ -6,7 +6,7 @@ namespace frar.lobbyserver;
 
 public class LobbyRouter : ThreadedRouter {
     public static LobbyModel sharedModel = new LobbyModel();
-    private static List<IConnection> liveConnections = new List<IConnection>();
+    public static Dictionary<string, IConnection> liveConnections = new Dictionary<string, IConnection>();
 
     private DatabaseInterface dbi;
     public Player? player = null;
@@ -20,15 +20,13 @@ public class LobbyRouter : ThreadedRouter {
     }
 
     public void Broadcast(Packet packet) {
-        foreach (IConnection connection in liveConnections) {
+        foreach (IConnection connection in liveConnections.Values) {
             connection.Write(packet);
         }
     }
 
     [Route(Rule = "(?i)^(?!(login)|(register)).*$", Index = -1)]
     public void CheckForLogin([Ctrl] RouterController ctrl) {
-        System.Console.WriteLine(" --- Auth");
-        System.Console.WriteLine(this.player);
         if (this.player == null) {
             var packet = new Packet("AuthError");
             packet["reason"] = $"client not logged in";
@@ -64,7 +62,7 @@ public class LobbyRouter : ThreadedRouter {
 
             this.player = sharedModel.AddPlayer(name);
             lock (liveConnections) {
-                liveConnections.Add(this.Connection);
+                liveConnections.Add(name, this.Connection);
             }
 
             var globalPacket = new Packet("PlayerLogin");
@@ -87,7 +85,7 @@ public class LobbyRouter : ThreadedRouter {
 
             this.player = sharedModel.AddPlayer(name);
             lock (liveConnections) {
-                liveConnections.Add(this.Connection);
+                liveConnections.Add(name, this.Connection);
             }
 
             var globalPacket = new Packet("PlayerLogin");
@@ -104,7 +102,6 @@ public class LobbyRouter : ThreadedRouter {
 
     [Route]
     public void Logout() {
-        System.Console.WriteLine(" --- Logout");
         if (player != null && sharedModel.HasPlayer(player.Name)) {
             var clientPacket = new Packet("LogoutAccepted");
             this.Connection.Write(clientPacket);
@@ -115,7 +112,7 @@ public class LobbyRouter : ThreadedRouter {
 
             sharedModel.RemovePlayer(player.Name);
             lock (liveConnections) {
-                liveConnections.Remove(this.Connection);
+                liveConnections.Remove(player.Name);
             }
         }
         else {
@@ -160,20 +157,23 @@ public class LobbyRouter : ThreadedRouter {
 
     [Route]
     public void JoinGame(string gamename, string password = "") {
+        if (sharedModel.HasGame(gamename) == false) {
+            var clientPacket = new Packet("JoinRejected");
+            clientPacket["reason"] = $"unknown game {gamename}";
+            this.Connection.Write(clientPacket);
+            return;
+        }
+
+        var game = sharedModel.GetGame(gamename);
+
         if (this.player!.HasGame) {
             var clientPacket = new Packet("JoinRejected");
             clientPacket["reason"] = "player already in game";
             this.Connection.Write(clientPacket);
-        }
-        else if (sharedModel.HasGame(gamename) == false) {
-            var clientPacket = new Packet("JoinRejected");
-            clientPacket["reason"] = $"unknown game {gamename}";
-            this.Connection.Write(clientPacket);
-        }
-        else if (sharedModel.GetGame(gamename).Password != password) {
-            var clientPacket = new Packet("JoinRejected");
-            clientPacket["reason"] = "passwords do not match";
-            this.Connection.Write(clientPacket);
+        }else if (!game.Invited.Contains(player.Name) && game.Password != password) {
+                var clientPacket = new Packet("JoinRejected");
+                clientPacket["reason"] = "passwords do not match";
+                this.Connection.Write(clientPacket);
         }
         else try {
                 sharedModel.GetGame(gamename).AddPlayer(this.player.Name);
@@ -195,5 +195,28 @@ public class LobbyRouter : ThreadedRouter {
 
     [Route]
     public void InvitePlayer(string playername) {
+        if (!this.player!.HasGame) {
+            var clientPacket = new Packet("InviteRejected");
+            clientPacket["playername"] = playername;
+            clientPacket["reason"] = "player not in game";
+            this.Connection.Write(clientPacket);
+        }
+        else if (!sharedModel.Players.ContainsKey(playername)) {
+            var clientPacket = new Packet("InviteRejected");
+            clientPacket["playername"] = playername;
+            clientPacket["reason"] = "unknown invitee";
+            this.Connection.Write(clientPacket);
+        }
+        else {
+            sharedModel.Games[player.Game].AddInvite(playername);
+
+            var clientPacket = new Packet("InviteAccepted");
+            clientPacket["playername"] = playername;
+            this.Connection.Write(clientPacket);
+
+            var invitedPacket = new Packet("Invite");
+            invitedPacket["gamename"] = this.player.Game;
+            liveConnections[playername].Write(invitedPacket);
+        }
     }
 }

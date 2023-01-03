@@ -20,6 +20,7 @@ public class LobbyTest {
     public void testInitialize() {
         dbi.ClearAll();
         LobbyRouter.sharedModel = new LobbyModel();
+        LobbyRouter.liveConnections = new Dictionary<string, IConnection>();
     }
 
     public User NewUser(string name, bool login = true) {
@@ -434,7 +435,7 @@ public class JoinGameTest : LobbyTest {
 /// Generate coverage reports
 /// reportgenerator -reports:lobbyServerTest/TestResults/**/*.xml -targetdir:"coverage" -reporttypes:Html
 /// </summary>
-// [TestClass]
+[TestClass]
 public class InviteTest : LobbyTest {
     /// <summary>
     /// Join a game without a password.
@@ -450,7 +451,7 @@ public class InviteTest : LobbyTest {
         adam.router.Process(new Packet("InvitePlayer", "eve"));
 
         // Client receives a InviteAccepted  packet.
-        Assert.IsTrue(eve.conn.Has("InviteAccepted"));
+        adam.conn.Assert("InviteAccepted");
 
         // Packet has invited players name
         var packet = adam.conn.Get("InviteAccepted");
@@ -459,8 +460,12 @@ public class InviteTest : LobbyTest {
         // Invited client joins game w/o password.
         eve.router.Process(new Packet("JoinGame", "adam's game"));
 
+        if (eve.conn.Has("JoinRejected")) {
+            System.Console.WriteLine(eve.conn.Peek("JoinRejected"));
+        }
+
         // Invited client recieves JoinAccepted packet.
-        Assert.IsTrue(eve.conn.Has("JoinAccepted"));
+        eve.conn.Assert("JoinAccepted");
     }
 
     /// <summary>
@@ -475,7 +480,7 @@ public class InviteTest : LobbyTest {
         adam.router.Process(new Packet("InvitePlayer", "eve"));
 
         // Client receives a InviteAccepted  packet.
-        Assert.IsTrue(eve.conn.Has("InviteAccepted"));
+        Assert.IsTrue(adam.conn.Has("InviteAccepted"));
 
         // Packet has invited players name
         var packet = adam.conn.Get("InviteAccepted");
@@ -500,7 +505,7 @@ public class InviteTest : LobbyTest {
         eve.router.Process(new Packet("JoinGame", "adam's game"));
 
         // Client receives a JoinRejected packet.
-        eve.conn.Assert("JoinRejected");
+        eve.conn.Assert("AuthError");
     }
 
     /// <summary>
