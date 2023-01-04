@@ -101,6 +101,26 @@ public class LobbyRouter : ThreadedRouter {
     }
 
     [Route]
+    public void LeaveGame() {
+        if (!player!.HasGame) {
+            var packet = new Packet("LeaveRejected");
+            packet["reason"] = "player not in game";
+            this.Connection.Write(packet);
+        }
+        else {
+            sharedModel.Games[player.Game].RemovePlayer(player.Name);
+            this.Connection.Write(new Packet("LeaveAccepted"));
+
+            var packet = new Packet("PlayerLeave");
+            packet["gamename"] = player.Game;
+            packet["playername"] = player.Name;
+            this.Broadcast(packet);
+
+            player.Game = "";
+        }
+    }
+
+    [Route]
     public void Logout() {
         if (player != null && sharedModel.HasPlayer(player.Name)) {
             var clientPacket = new Packet("LogoutAccepted");
@@ -170,10 +190,11 @@ public class LobbyRouter : ThreadedRouter {
             var clientPacket = new Packet("JoinRejected");
             clientPacket["reason"] = "player already in game";
             this.Connection.Write(clientPacket);
-        }else if (!game.Invited.Contains(player.Name) && game.Password != password) {
-                var clientPacket = new Packet("JoinRejected");
-                clientPacket["reason"] = "passwords do not match";
-                this.Connection.Write(clientPacket);
+        }
+        else if (!game.Invited.Contains(player.Name) && game.Password != password) {
+            var clientPacket = new Packet("JoinRejected");
+            clientPacket["reason"] = "passwords do not match";
+            this.Connection.Write(clientPacket);
         }
         else try {
                 sharedModel.GetGame(gamename).AddPlayer(this.player.Name);
@@ -218,5 +239,21 @@ public class LobbyRouter : ThreadedRouter {
             invitedPacket["gamename"] = this.player.Game;
             liveConnections[playername].Write(invitedPacket);
         }
+    }
+
+    [Route]
+    public void RequestPlayers() {
+        Dictionary<string, Player> players = sharedModel.Players;
+        var packet = new Packet("PlayerList");
+        packet["players"] = players;
+        this.Connection.Write(packet);
+    }
+
+    [Route]
+    public void RequestGames() {
+        Dictionary<string, Game> games = sharedModel.Games;
+        var packet = new Packet("GameList");
+        packet["games"] = games;
+        this.Connection.Write(packet);        
     }
 }

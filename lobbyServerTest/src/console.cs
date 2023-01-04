@@ -5,11 +5,12 @@ using System.Diagnostics;
 using System.IO;
 using frar.lobbyserver.test;
 using frar.clientserver;
+using System.Collections.Generic;
+using Newtonsoft.Json;
 
-var test = new LobbyTest();
+var testbed = new LobbyTest();
+var adam = testbed.NewUser("adam");
+adam.CreateGame();
+var player = adam.GetGame("adam's game");
 
-var adam = test.NewUser("adam", false);
-var packet = new Packet("adam", "super secret", "who@ami");
-System.Console.WriteLine(packet);
-adam.router.Process(new Packet("adam", "super secret", "who@ami"));
-System.Console.WriteLine(adam.conn.Pop());
+System.Console.WriteLine(JsonConvert.SerializeObject(player));
