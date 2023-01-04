@@ -8,7 +8,7 @@ using frar.clientserver;
 using System.Collections.Generic;
 using Newtonsoft.Json;
 
-var testbed = new LobbyTest();
+var testbed = new ALobbyTest();
 var adam = testbed.NewUser("adam");
 adam.CreateGame();
 var player = adam.GetGame("adam's game");
