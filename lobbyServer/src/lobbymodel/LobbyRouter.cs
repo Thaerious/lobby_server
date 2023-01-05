@@ -25,6 +25,21 @@ public class LobbyRouter : ThreadedRouter {
         }
     }
 
+    /// <summary>
+    /// Retrieve the game object for specified player.
+    /// </summary>
+    /// <param name="player"></param>
+    /// <returns></returns>
+    public Game GetPlayersGame(string playername) {
+        var gamename = sharedModel.GetPlayer(playername).Game;
+        return sharedModel.GetGame(gamename);
+    }
+
+    public Game GetPlayersGame() {
+        ArgumentNullException.ThrowIfNull(this.player);
+        return GetPlayersGame(this.player.Name);
+    }
+
     [Route(Rule = "(?i)^(?!(login)|(register)).*$", Index = -1)]
     public void CheckForLogin([Ctrl] RouterController ctrl) {
         if (this.player == null) {
@@ -106,6 +121,23 @@ public class LobbyRouter : ThreadedRouter {
             var packet = new Packet("LeaveRejected");
             packet["reason"] = "player not in game";
             this.Connection.Write(packet);
+        }
+        else if (GetPlayersGame().Owner == this.player.Name) {
+            foreach (string playername in GetPlayersGame().Players) {
+                if (playername == this.player.Name) continue;
+                var targetPacket = new Packet("KickedFromGame");
+                targetPacket["reason"] = "The owner terminated the game";
+                liveConnections[playername].Write(targetPacket);
+                sharedModel.Players[playername].ClearGame();
+            }
+
+            this.Connection.Write(new Packet("LeaveAccepted"));
+
+            var packet = new Packet("RemoveGame");
+            packet["gamename"] = this.player.Game;
+            this.Broadcast(packet);
+
+            this.player.ClearGame();
         }
         else {
             sharedModel.Games[player.Game].RemovePlayer(player.Name);
@@ -254,6 +286,42 @@ public class LobbyRouter : ThreadedRouter {
         Dictionary<string, Game> games = sharedModel.Games;
         var packet = new Packet("GameList");
         packet["games"] = games;
-        this.Connection.Write(packet);        
+        this.Connection.Write(packet);
+    }
+
+    [Route]
+    public void KickPlayer(string playername) {
+        if (!this.player!.HasGame) {
+            var packet = new Packet("KickRejected");
+            packet["reason"] = "Player is not in a game";
+            this.Connection.Write(packet);
+        }
+        else if (this.player.Name == playername) {
+            var packet = new Packet("KickRejected");
+            packet["reason"] = "Can not kick owner";
+            this.Connection.Write(packet);
+        }
+        else if (!GetPlayersGame(this.player.Name).Players.Contains(playername)) {
+            var packet = new Packet("KickRejected");
+            packet["reason"] = "Target player is not in the game";
+            this.Connection.Write(packet);
+        }
+        else {
+            sharedModel.GetGame(this.player!.Game).RemovePlayer(playername);
+            sharedModel.GetPlayer(playername).ClearGame();
+
+            var ownerPacket = new Packet("KickAccepted");
+            ownerPacket["playername"] = playername;
+            this.Connection.Write(ownerPacket);
+
+            var targetPacket = new Packet("KickedFromGame");
+            targetPacket["reason"] = "The owner has removed you from the game";
+            liveConnections[playername].Write(targetPacket);
+
+            var globalPacket = new Packet("PlayerLeave");
+            globalPacket["playername"] = playername;
+            globalPacket["gamename"] = this.player.Game;
+            this.Broadcast(globalPacket);
+        }
     }
 }

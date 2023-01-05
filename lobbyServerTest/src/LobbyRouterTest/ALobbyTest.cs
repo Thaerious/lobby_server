@@ -55,6 +55,11 @@ public class ALobbyTest {
             return this;
         }
 
+        /// <summary>
+        /// Retrieve a game object for specified game.
+        /// </summary>
+        /// <param name="gameName"></param>
+        /// <returns></returns>
         public Game GetGame(string gameName) {
             this.router.Process(new Packet("RequestGames"));
 
@@ -65,6 +70,21 @@ public class ALobbyTest {
             return games[gameName];
         }
 
+        public Dictionary<string, Game> GetGames() {
+            this.router.Process(new Packet("RequestGames"));
+
+            Dictionary<string, Game> games =
+                this.conn.Get("GameList")
+                .Get<Dictionary<string, Game>>("games");
+
+            return games;
+        }
+
+        /// <summary>
+        /// Retrieve a player object for specified player.
+        /// </summary>
+        /// <param name="playerName"></param>
+        /// <returns></returns>
         public Player GetPlayer(string playerName) {
             this.router.Process(new Packet("RequestPlayers"));
 

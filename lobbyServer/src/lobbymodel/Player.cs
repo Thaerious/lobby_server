@@ -15,5 +15,7 @@ public partial class LobbyModel {
         }
 
         [JsonIgnore] public bool HasGame { get => this.Game != ""; }
+
+        public void ClearGame() => this.Game = "";
     }
 }

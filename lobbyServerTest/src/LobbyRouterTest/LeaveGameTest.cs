@@ -1,5 +1,6 @@
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using frar.clientserver;
+using Newtonsoft.Json;
 
 namespace frar.lobbyserver.test;
 
@@ -16,7 +17,7 @@ namespace frar.lobbyserver.test;
 /// reportgenerator -reports:lobbyServerTest/TestResults/**/*.xml -targetdir:"coverage" -reporttypes:Html
 /// </summary>
 [TestClass]
-public class LeaveTest : ALobbyTest {
+public class LeaveGameTest : ALobbyTest {
     /// <summary>
     /// Leave game before logging in.
     /// Client receives AuthError.
@@ -28,15 +29,11 @@ public class LeaveTest : ALobbyTest {
         eve.conn.Assert("AuthError");        
     }
 
-    /// <summary>
-    /// Join a game without a password.
-    /// Player joins a game because they are not already in a game.
-    /// - Client receives a JoinAccepted packet.
-    /// </summary>
     [TestMethod]
     public void player_leave_game_normally() {
         var adam = NewUser("adam").CreateGame();
         var eve = NewUser("eve");
+        var able = NewUser("able");
 
         // Player joins game.
         eve.router.Process(new Packet("JoinGame", "adam's game"));
@@ -44,17 +41,34 @@ public class LeaveTest : ALobbyTest {
         // Non-owner leaves game
         eve.router.Process(new Packet("LeaveGame"));
 
+        // Notify the player
         eve.conn.Assert("LeaveAccepted");
 
+        // Notify global
         adam.conn
             .Assert("PlayerLeave")
             .Assert("gamename", "adam's game")
             .Assert("playername", "eve");
+
+        eve.conn
+            .Assert("PlayerLeave")
+            .Assert("gamename", "adam's game")
+            .Assert("playername", "eve");
+
+        able.conn
+            .Assert("PlayerLeave")
+            .Assert("gamename", "adam's game")
+            .Assert("playername", "eve");
+
+        // The game no longer has the player
+        var contains = adam.GetGame("adam's game").Players.Contains("eve");
+        Assert.IsFalse(contains);
+
+        // The player no longer has the game
+        var hasGame = adam.GetPlayer("eve").HasGame;
+        Assert.IsFalse(hasGame);            
     }
 
-    /// <summary>
-    /// Players can be invited w/o a password
-    /// </summary>
     [TestMethod]
     public void player_leaves_game_while_not_in_game() {
         var adam = NewUser("adam").CreateGame();
@@ -65,19 +79,45 @@ public class LeaveTest : ALobbyTest {
         eve.conn.Assert("LeaveRejected");
     }
 
-
     /// <summary>
     /// Owner leaves game, the game terminates, all players are removed.
     /// </summary>
-    // [TestMethod]
+    [TestMethod]
     public void owner_leaves_game() {
         var adam = NewUser("adam").CreateGame();
         var eve = NewUser("eve");
+        var able = NewUser("able");  // doesn't join
 
         eve.router.Process(new Packet("JoinGame", "adam's game"));
         adam.router.Process(new Packet("LeaveGame"));
 
+        // Notify the player (owner)
         adam.conn.Assert("LeaveAccepted");
+
+        // Notify the non-owner
+        eve.conn.Assert("KickedFromGame");
+
+        // Notify global
+        adam.conn
+            .Assert("RemoveGame")
+            .Assert("gamename", "adam's game");
+
+        eve.conn
+            .Assert("RemoveGame")
+            .Assert("gamename", "adam's game");
+
+        able.conn
+            .Assert("RemoveGame")
+            .Assert("gamename", "adam's game");
+
+        // Game no longer exists
+        var contains = adam.GetGames().ContainsKey("adams's game");
+        Assert.IsFalse(contains);
+System.Console.WriteLine(JsonConvert.SerializeObject(adam.GetPlayer("eve")));
+System.Console.WriteLine(adam.GetPlayer("eve").HasGame);
+        // Players no longer have a game
+        Assert.IsFalse(adam.GetPlayer("adam").HasGame);
+        Assert.IsFalse(adam.GetPlayer("eve").HasGame);        
     }
 
 }
