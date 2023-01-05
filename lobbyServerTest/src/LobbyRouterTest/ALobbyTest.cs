@@ -20,7 +20,7 @@ public class ALobbyTest {
     public void testInitialize() {
         dbi.ClearAll();
         LobbyRouter.sharedModel = new LobbyModel();
-        LobbyRouter.liveConnections = new Dictionary<string, IConnection>();
+        LobbyRouter.liveRouters = new Dictionary<string, LobbyRouter>();
     }
 
     public User NewUser(string name, bool login = true) {
@@ -94,5 +94,15 @@ public class ALobbyTest {
 
             return players[playerName];
         }
+
+        public Dictionary<string, Player> GetPlayers() {
+            this.router.Process(new Packet("RequestPlayers"));
+
+            Dictionary<string, Player> players =
+                this.conn.Get("PlayerList")
+                .Get<Dictionary<string, Player>>("players");
+
+            return players;
+        }        
     }
 }

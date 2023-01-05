@@ -6,13 +6,13 @@ namespace frar.lobbyserver;
 
 public class LobbyRouter : ThreadedRouter {
     public static LobbyModel sharedModel = new LobbyModel();
-    public static Dictionary<string, IConnection> liveConnections = new Dictionary<string, IConnection>();
+    public static Dictionary<string, LobbyRouter> liveRouters = new Dictionary<string, LobbyRouter>();
 
     private DatabaseInterface dbi;
-    public Player? player = null;
+    Player? player = null;
 
     public LobbyRouter() {
-        this.dbi = new DatabaseInterface();
+        this.dbi = new DatabaseInterface();        
     }
 
     public LobbyRouter(DatabaseInterface dbi) {
@@ -20,8 +20,8 @@ public class LobbyRouter : ThreadedRouter {
     }
 
     public void Broadcast(Packet packet) {
-        foreach (IConnection connection in liveConnections.Values) {
-            connection.Write(packet);
+        foreach (LobbyRouter router in liveRouters.Values) {
+            router.Connection.Write(packet);
         }
     }
 
@@ -76,8 +76,8 @@ public class LobbyRouter : ThreadedRouter {
             this.Connection.Write(clientPacket);
 
             this.player = sharedModel.AddPlayer(name);
-            lock (liveConnections) {
-                liveConnections.Add(name, this.Connection);
+            lock (liveRouters) {
+                liveRouters.Add(name, this);
             }
 
             var globalPacket = new Packet("PlayerLogin");
@@ -99,8 +99,8 @@ public class LobbyRouter : ThreadedRouter {
             this.Connection.Write(clientPacket);
 
             this.player = sharedModel.AddPlayer(name);
-            lock (liveConnections) {
-                liveConnections.Add(name, this.Connection);
+            lock (liveRouters) {
+                liveRouters.Add(name, this);
             }
 
             var globalPacket = new Packet("PlayerLogin");
@@ -127,7 +127,7 @@ public class LobbyRouter : ThreadedRouter {
                 if (playername == this.player.Name) continue;
                 var targetPacket = new Packet("KickedFromGame");
                 targetPacket["reason"] = "The owner terminated the game";
-                liveConnections[playername].Write(targetPacket);
+                liveRouters[playername].Connection.Write(targetPacket);
                 sharedModel.Players[playername].ClearGame();
             }
 
@@ -163,8 +163,9 @@ public class LobbyRouter : ThreadedRouter {
             this.Broadcast(globalPacket);
 
             sharedModel.RemovePlayer(player.Name);
-            lock (liveConnections) {
-                liveConnections.Remove(player.Name);
+            lock (liveRouters) {
+                liveRouters.Remove(player.Name);
+                this.player = null;
             }
         }
         else {
@@ -269,7 +270,7 @@ public class LobbyRouter : ThreadedRouter {
 
             var invitedPacket = new Packet("Invite");
             invitedPacket["gamename"] = this.player.Game;
-            liveConnections[playername].Write(invitedPacket);
+            liveRouters[playername].Connection.Write(invitedPacket);
         }
     }
 
@@ -316,12 +317,44 @@ public class LobbyRouter : ThreadedRouter {
 
             var targetPacket = new Packet("KickedFromGame");
             targetPacket["reason"] = "The owner has removed you from the game";
-            liveConnections[playername].Write(targetPacket);
+            liveRouters[playername].Connection.Write(targetPacket);
 
             var globalPacket = new Packet("PlayerLeave");
             globalPacket["playername"] = playername;
             globalPacket["gamename"] = this.player.Game;
             this.Broadcast(globalPacket);
+        }
+    }
+
+    [Route]
+    public void StartGame() {
+        if (!this.player!.HasGame || GetPlayersGame().Owner != this.player.Name) {
+            var packet = new Packet("StartRejected");
+            packet["reason"] = "Player is not game owner";
+            this.Connection.Write(packet);
+        }
+        else {
+            var removeGamePacket = new Packet("RemoveGame");
+            removeGamePacket["gamename"] = this.player.Game;
+            this.Broadcast(removeGamePacket);
+
+            var startGamePacket = new Packet("StartGame");
+            startGamePacket["ip"] = "127.0.0.1";
+            startGamePacket["port"] = "9999";
+
+            var players = sharedModel.StartGame(this.player.Game);
+            foreach (String playername in players) {
+                liveRouters[playername].Connection.Write(startGamePacket);
+
+                var globalPacket = new Packet("LeaveLobby");
+                globalPacket["playername"] = playername;
+                this.Broadcast(globalPacket);
+
+                lock (liveRouters) {
+                    liveRouters[playername].player = null;
+                    liveRouters.Remove(playername);
+                }
+            }
         }
     }
 }

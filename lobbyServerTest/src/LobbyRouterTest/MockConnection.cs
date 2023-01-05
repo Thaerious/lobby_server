@@ -56,6 +56,15 @@ public class MockConnection : IConnection {
         return this.Peek(action);
     }
 
+    public Packet Assert<T>(string action, string key, T value) {
+        foreach (Packet packet in this.Packets) {
+            if (packet.Action != action) continue;
+            if (!packet.Has(key)) continue;
+            if (packet.Get<T>(key)!.Equals(value)) return packet;
+        }
+        throw new Exception($"Unknown Packet: {action}.{key}");
+    }    
+
     public Packet Peek(string action) {
         foreach (Packet packet in this.Packets) {
             if (packet.Action == action) {

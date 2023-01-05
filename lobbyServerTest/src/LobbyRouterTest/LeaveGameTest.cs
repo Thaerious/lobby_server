@@ -113,11 +113,9 @@ public class LeaveGameTest : ALobbyTest {
         // Game no longer exists
         var contains = adam.GetGames().ContainsKey("adams's game");
         Assert.IsFalse(contains);
-System.Console.WriteLine(JsonConvert.SerializeObject(adam.GetPlayer("eve")));
-System.Console.WriteLine(adam.GetPlayer("eve").HasGame);
+
         // Players no longer have a game
         Assert.IsFalse(adam.GetPlayer("adam").HasGame);
         Assert.IsFalse(adam.GetPlayer("eve").HasGame);        
     }
-
 }

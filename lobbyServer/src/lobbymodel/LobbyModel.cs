@@ -85,4 +85,31 @@ public partial class LobbyModel {
     public bool HasGame(string name) {
         return this.games.ContainsKey(name);
     }
+
+    /// <summary>
+    /// Remove the game from the model.
+    /// Clear all players game field.
+    /// </summary>
+    /// <param name="name"></param>
+    public void RemoveGame(string name) {
+        foreach (String playername in this.GetGame(name).Players) {
+            this.players[playername].ClearGame();
+        }
+        this.games.Remove(name);        
+    }
+
+    /// <summary>
+    /// Remove the game from the model.
+    /// Remove all players from the model.
+    /// </summary>
+    /// <param name="name"></param>
+    public List<string> StartGame(string name) {
+        List<string> players = new List<string>();
+        foreach (String playername in this.GetGame(name).Players) {
+            this.players.Remove(playername);
+            players.Add(playername);
+        }
+        this.games.Remove(name);
+        return players;
+    }    
 }
