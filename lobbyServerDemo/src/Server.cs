@@ -1,4 +1,5 @@
 using frar.clientserver;
+using System.Reflection;
 namespace frar.lobbyserver;
 
 public class Server : frar.clientserver.Server<LobbyRouter> {
@@ -26,9 +27,14 @@ public class Server : frar.clientserver.Server<LobbyRouter> {
 
 public class EchoHandler {
     [OnConnect]
-    public void OnConnect(Connection connection) {
+    public void OnConnect(IConnection connection) {
         System.Console.WriteLine("New Connection");
     }
+
+    [OnDisconnect]
+    public void OnDisconnect(DISCONNECT_REASON reason) {        
+        System.Console.WriteLine("Client Disconnect: " + reason);
+    }    
 
     [Route(Rule = ".*", Index = -1)]
     public void Echo([Req]Packet packet) {

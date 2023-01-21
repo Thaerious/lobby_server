@@ -40,6 +40,11 @@ public class LobbyRouter : ThreadedRouter {
         return GetPlayersGame(this.player.Name);
     }
 
+    [OnDisconnect]
+    public void OnDisconnect(DISCONNECT_REASON reason) {
+        this.Logout();
+    }
+
     [Route(Rule = "(?i)^(?!(login)|(register)).*$", Index = -1)]
     public void CheckForLogin([Ctrl] RouterController ctrl) {
         if (this.player == null) {
@@ -68,6 +73,7 @@ public class LobbyRouter : ThreadedRouter {
     public void Login(string name, string password) {
         if (sharedModel.HasPlayer(name)) {
             var packet = new Packet("LoginRejected");
+            packet["reason"] = "Player alrady exists in lobby";
             this.Connection.Write(packet);
         }
         else if (dbi.Verify(name, password)) {
@@ -86,6 +92,7 @@ public class LobbyRouter : ThreadedRouter {
         }
         else {
             var packet = new Packet("LoginRejected");
+            packet["reason"] = "Login verification failed";
             this.Connection.Write(packet);
         }
     }

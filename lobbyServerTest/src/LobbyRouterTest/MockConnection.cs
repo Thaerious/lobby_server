@@ -5,13 +5,15 @@ using System;
 namespace frar.lobbyserver.test;
 
 public class MockConnection : IConnection {
+    public event ShutDownEvent? OnShutDown;
+
     public List<Packet> Packets = new List<Packet>();
 
     public Packet Read() {
         throw new NotImplementedException();
     }
 
-    public void Shutdown() {
+    public void Shutdown(DISCONNECT_REASON reason) {
         throw new NotImplementedException();
     }
 
